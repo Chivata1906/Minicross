@@ -1,0 +1,290 @@
+/**
+ * Minicross Colombia 2026 - Google Apps Script Backend
+ *
+ * SETUP: ver docs/SETUP-GOOGLE-SHEETS.md
+ *
+ * Configura SPREADSHEET_ID y DRIVE_FOLDER_ID abajo.
+ * Despliega como Web App: Ejecutar como "Yo", Acceso "Cualquier persona".
+ */
+
+const SPREADSHEET_ID = '1g5crmfmbcxyvmLMXxYECxO90gFYiXf7P5JaSze7pmbI';
+const DRIVE_FOLDER_ID = '1oImoS0x__kgBBXaL9HAg3Qf-4Zj0Xz0l';
+
+const EVENT_HEADERS = ['id', 'name', 'date', 'location', 'city', 'description', 'active'];
+const REG_HEADERS = [
+  'id', 'eventId', 'nombre', 'apellido', 'identificacion',
+  'identificacionArchivo', 'identificacionFileName', 'identificacionFileType',
+  'fechaNacimiento', 'edad', 'email', 'celular', 'ciudad', 'marcaMoto',
+  'numeroPiloto', 'categoriaId', 'categoriaLabel', 'createdAt', 'updatedAt',
+];
+
+// ─── HTTP handlers ───────────────────────────────────────────────────────────
+
+function doGet(e) {
+  e = e || { parameter: {} };
+  const action = (e.parameter.action || 'all').toString();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  if (action === 'checkPilot') {
+    const eventId = e.parameter.eventId;
+    const numero = Number(e.parameter.numero);
+    const excludeId = e.parameter.excludeId || null;
+    const available = isPilotNumberAvailable_(ss, eventId, numero, excludeId);
+    return jsonResponse({ available: available });
+  }
+
+  if (action === 'events') {
+    return jsonResponse({ events: getEvents_(ss) });
+  }
+
+  if (action === 'registrations') {
+    return jsonResponse({ registrations: getRegistrations_(ss) });
+  }
+
+  return jsonResponse({
+    events: getEvents_(ss),
+    registrations: getRegistrations_(ss),
+  });
+}
+
+function doPost(e) {
+  if (!e || !e.postData || !e.postData.contents) {
+    return jsonResponse({
+      success: false,
+      error: 'doPost solo funciona via HTTP desde la web. Para configurar, ejecuta setupSheets.',
+    });
+  }
+  const body = JSON.parse(e.postData.contents);
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  switch (body.action) {
+    case 'createRegistration':
+      return jsonResponse(createRegistration_(ss, body.data));
+    case 'updateRegistration':
+      return jsonResponse(updateRegistration_(ss, body.id, body.data));
+    case 'deleteRegistration':
+      return jsonResponse(deleteRegistration_(ss, body.id));
+    case 'saveEvents':
+      writeEvents_(ss, body.events);
+      return jsonResponse({ success: true });
+    case 'saveRegistrations':
+      writeRegistrations_(ss, body.registrations);
+      return jsonResponse({ success: true });
+    default:
+      return jsonResponse({ success: false, error: 'Accion desconocida' });
+  }
+}
+
+// ─── Registrations CRUD ──────────────────────────────────────────────────────
+
+function createRegistration_(ss, data) {
+  if (!isPilotNumberAvailable_(ss, data.eventId, Number(data.numeroPiloto))) {
+    return {
+      success: false,
+      error: 'El numero de piloto ' + data.numeroPiloto + ' ya esta registrado en este evento.',
+    };
+  }
+
+  if (data.identificacionArchivo && data.identificacionArchivo.indexOf('data:') === 0) {
+    data.identificacionArchivo = saveFileToDrive_(data);
+  }
+
+  const sheet = getOrCreateSheet_(ss, 'Registrations', REG_HEADERS);
+  appendRow_(sheet, REG_HEADERS, data);
+  return { success: true, registration: data };
+}
+
+function updateRegistration_(ss, id, updates) {
+  const sheet = ss.getSheetByName('Registrations');
+  if (!sheet) return { success: false, error: 'Hoja Registrations no encontrada' };
+
+  const rows = sheetToObjects_(sheet);
+  const index = rows.findIndex(function (r) { return String(r.id) === String(id); });
+  if (index === -1) return { success: false, error: 'Inscripcion no encontrada' };
+
+  const merged = {};
+  REG_HEADERS.forEach(function (h) {
+    merged[h] = updates[h] !== undefined ? updates[h] : rows[index][h];
+  });
+  merged.id = id;
+  merged.updatedAt = new Date().toISOString();
+
+  if (
+    updates.numeroPiloto !== undefined &&
+    !isPilotNumberAvailable_(ss, merged.eventId, Number(merged.numeroPiloto), id)
+  ) {
+    return { success: false, error: 'El numero de piloto ' + merged.numeroPiloto + ' ya esta en uso.' };
+  }
+
+  const rowNum = index + 2;
+  REG_HEADERS.forEach(function (h, i) {
+    sheet.getRange(rowNum, i + 1).setValue(merged[h] !== undefined ? merged[h] : '');
+  });
+
+  return { success: true, registration: merged };
+}
+
+function deleteRegistration_(ss, id) {
+  const sheet = ss.getSheetByName('Registrations');
+  if (!sheet) return { success: false, error: 'Hoja no encontrada' };
+
+  const rows = sheetToObjects_(sheet);
+  const index = rows.findIndex(function (r) { return String(r.id) === String(id); });
+  if (index === -1) return { success: false, error: 'Inscripcion no encontrada' };
+
+  sheet.deleteRow(index + 2);
+  return { success: true };
+}
+
+// ─── Pilot number check ──────────────────────────────────────────────────────
+
+function isPilotNumberAvailable_(ss, eventId, numero, excludeId) {
+  const regs = getRegistrations_(ss);
+  for (var i = 0; i < regs.length; i++) {
+    var r = regs[i];
+    if (
+      String(r.eventId) === String(eventId) &&
+      Number(r.numeroPiloto) === Number(numero) &&
+      (!excludeId || String(r.id) !== String(excludeId))
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// ─── Drive: guardar documento de identidad ───────────────────────────────────
+
+function saveFileToDrive_(data) {
+  try {
+    var folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+    var parts = data.identificacionArchivo.split(',');
+    var base64 = parts.length > 1 ? parts[1] : parts[0];
+    var blob = Utilities.newBlob(
+      Utilities.base64Decode(base64),
+      data.identificacionFileType || 'application/octet-stream',
+      data.identificacionFileName || 'documento'
+    );
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return file.getUrl();
+  } catch (err) {
+    return '[error al subir: ' + err.message + ']';
+  }
+}
+
+// ─── Events ──────────────────────────────────────────────────────────────────
+
+function getEvents_(ss) {
+  var sheet = ss.getSheetByName('Events');
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  return sheetToObjects_(sheet);
+}
+
+function getRegistrations_(ss) {
+  var sheet = ss.getSheetByName('Registrations');
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  return sheetToObjects_(sheet);
+}
+
+function writeEvents_(ss, events) {
+  var sheet = getOrCreateSheet_(ss, 'Events', EVENT_HEADERS);
+  writeObjects_(sheet, EVENT_HEADERS, events);
+}
+
+function writeRegistrations_(ss, registrations) {
+  var sheet = getOrCreateSheet_(ss, 'Registrations', REG_HEADERS);
+  writeObjects_(sheet, REG_HEADERS, registrations);
+}
+
+// ─── Sheet helpers ───────────────────────────────────────────────────────────
+
+function getOrCreateSheet_(ss, name, headers) {
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function sheetToObjects_(sheet) {
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return [];
+  var headers = data[0];
+  var result = [];
+  for (var i = 1; i < data.length; i++) {
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) {
+      obj[headers[j]] = data[i][j];
+    }
+    result.push(obj);
+  }
+  return result;
+}
+
+function appendRow_(sheet, headers, obj) {
+  sheet.appendRow(headers.map(function (h) { return obj[h] !== undefined ? obj[h] : ''; }));
+}
+
+function writeObjects_(sheet, headers, objects) {
+  sheet.clear();
+  sheet.appendRow(headers);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  sheet.setFrozenRows(1);
+  objects.forEach(function (obj) {
+    appendRow_(sheet, headers, obj);
+  });
+}
+
+function jsonResponse(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ─── Utilidad: crear hojas iniciales (ejecutar una vez manualmente) ──────────
+
+function setupSheets() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  getOrCreateSheet_(ss, 'Events', EVENT_HEADERS);
+  getOrCreateSheet_(ss, 'Registrations', REG_HEADERS);
+
+  var eventsSheet = ss.getSheetByName('Events');
+  if (eventsSheet.getLastRow() === 1) {
+    writeEvents_(ss, [
+      {
+        id: 'evt-001',
+        name: 'Valida 1 - Bogota',
+        date: '2026-03-15',
+        location: 'Pista Off-Road El Dorado',
+        city: 'Bogota',
+        description: 'Primera valida del campeonato. Triple Corona: 3 mangas.',
+        active: true,
+      },
+      {
+        id: 'evt-002',
+        name: 'Valida 2 - Medellin',
+        date: '2026-05-20',
+        location: 'Autodromo del Oriente',
+        city: 'Medellin',
+        description: 'Segunda valida del campeonato.',
+        active: true,
+      },
+    ]);
+  }
+  Logger.log('Hojas creadas correctamente.');
+}
+
+/** Ejecuta ESTA funcion desde el editor (no doGet). Crea las hojas y eventos de ejemplo. */
+function testConnection() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+  setupSheets();
+  Logger.log('Sheet: ' + ss.getName());
+  Logger.log('Carpeta Drive: ' + folder.getName());
+  Logger.log('Eventos: ' + getEvents_(ss).length);
+  Logger.log('Todo OK. Ahora despliega como Web App.');
+}

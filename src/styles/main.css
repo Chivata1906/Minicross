@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #06142B;
+  --color-secondary: #00C2FF;
+  --color-accent: #FFD400;
+  --color-orange: #FF7A00;
+  --color-dark: #02060D;
+  --color-white: #FFFFFF;
+  --font-title: 'Bebas Neue', sans-serif;
+  --font-body: 'Montserrat', sans-serif;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply font-body text-white antialiased;
+    background: linear-gradient(135deg, #06142B 0%, #02060D 100%);
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl bg-accent px-6 py-3 font-semibold text-primary transition-all duration-300 hover:bg-orange hover:shadow-glow-yellow;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-xl bg-secondary px-6 py-3 font-semibold text-white transition-all duration-300 hover:bg-neon-light hover:shadow-glow;
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center justify-center rounded-xl border-2 border-secondary px-6 py-3 font-semibold text-secondary transition-all duration-300 hover:bg-secondary hover:text-white hover:shadow-glow;
+  }
+
+  .card {
+    @apply rounded-xl border border-secondary/30 bg-blue-medium/40 p-6 backdrop-blur-sm transition-all duration-300 hover:border-secondary/60 hover:shadow-glow;
+  }
+
+  .input-field {
+    @apply w-full rounded-xl border border-secondary/30 bg-primary/60 px-4 py-3 text-white placeholder-gray-400 outline-none transition-all duration-300 focus:border-secondary focus:shadow-glow;
+  }
+
+  .section-title {
+    @apply font-title text-4xl tracking-wider text-white md:text-5xl;
+  }
+
+  .shield-badge {
+    @apply inline-block skew-x-[-6deg] rounded-lg bg-accent px-4 py-1 font-title text-lg tracking-wider text-primary;
+  }
+}
+
+.dirt-texture {
+  background-image: radial-gradient(circle at 20% 80%, rgba(255, 122, 0, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(0, 194, 255, 0.06) 0%, transparent 50%);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease forwards;
+}
