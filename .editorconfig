@@ -1,3 +1,4 @@
+# UTF-8 obligatorio — ver docs/ENCODING.md y .vscode/settings.json
 root = true
 
 [*]

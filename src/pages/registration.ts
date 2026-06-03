@@ -52,6 +52,22 @@ function renderPilotOptions(numbers: number[], selected?: number): string {
   );
 }
 
+function renderLoadingPanel(): string {
+  return `
+    <div class="flex flex-col items-center justify-center gap-5 py-16 text-center" role="status" aria-live="polite">
+      <div class="h-14 w-14 animate-spin rounded-full border-4 border-secondary/25 border-t-secondary"></div>
+      <div>
+        <p class="font-title text-xl tracking-wide text-secondary">Procesando datos</p>
+        <p class="mt-2 text-sm text-gray-light">Consultando eventos y numeros de piloto en la base de datos...</p>
+      </div>
+      <div class="flex gap-1.5">
+        <span class="h-2 w-2 animate-pulse rounded-full bg-secondary" style="animation-delay: 0ms"></span>
+        <span class="h-2 w-2 animate-pulse rounded-full bg-accent" style="animation-delay: 150ms"></span>
+        <span class="h-2 w-2 animate-pulse rounded-full bg-secondary" style="animation-delay: 300ms"></span>
+      </div>
+    </div>`;
+}
+
 function renderForm(events: Event[], selectedEventId: string | null, pilotNumbers: number[]): string {
   const eventOptions = events
     .filter((e) => e.active)
@@ -139,7 +155,7 @@ function renderForm(events: Event[], selectedEventId: string | null, pilotNumber
         </div>
       </div>
 
-      <button type="submit" class="btn-primary w-full text-lg py-4">Enviar inscripcion</button>
+      <button type="submit" class="btn-primary w-full text-lg py-4">Enviar inscripción</button>
     </form>`;
 }
 
@@ -154,13 +170,25 @@ async function refreshPilotSelect(eventId: string): Promise<void> {
     return;
   }
 
-  status.textContent = 'Cargando numeros disponibles...';
-  const numbers = await getAvailablePilotNumbers(eventId);
-  const current = Number(select.value);
-  select.innerHTML = renderPilotOptions(numbers, current || undefined);
-  status.textContent = numbers.length
-    ? `${numbers.length} numero(s) disponible(s) para este evento.`
-    : 'No hay numeros disponibles en este evento.';
+  select.disabled = true;
+  select.classList.add('opacity-60', 'pointer-events-none');
+  status.innerHTML =
+    '<span class="inline-flex items-center gap-2 text-secondary"><span class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-secondary/30 border-t-secondary"></span>Consultando numeros disponibles...</span>';
+
+  try {
+    const numbers = await getAvailablePilotNumbers(eventId);
+    const current = Number(select.value);
+    select.innerHTML = renderPilotOptions(numbers, current || undefined);
+    status.textContent = numbers.length
+      ? `${numbers.length} numero(s) disponible(s) para este evento.`
+      : 'No hay numeros disponibles en este evento.';
+  } catch {
+    select.innerHTML = '<option value="">Error al cargar numeros</option>';
+    status.textContent = 'No se pudieron cargar los numeros. Intenta de nuevo.';
+  } finally {
+    select.disabled = false;
+    select.classList.remove('opacity-60', 'pointer-events-none');
+  }
 }
 
 function updateCategories(age: number): void {
@@ -215,41 +243,7 @@ async function handleFileInput(
   preview.classList.remove('hidden');
 }
 
-export async function initRegistrationPage(): Promise<void> {
-  const app = document.getElementById('app');
-  if (!app) return;
-
-  const events = (await loadEvents()).filter((e) => e.active);
-  const eventIdFromUrl = getEventIdFromUrl();
-  const initialEventId = eventIdFromUrl && events.some((e) => e.id === eventIdFromUrl)
-    ? eventIdFromUrl
-    : events[0]?.id ?? null;
-
-  const initialPilots = initialEventId ? await getAvailablePilotNumbers(initialEventId) : [];
-
-  app.innerHTML = `
-    ${renderNavbar('inscripcion')}
-    <main class="mx-auto max-w-3xl px-4 py-12">
-      <div class="mb-8 text-center">
-        <h1 class="section-title mb-4">Inscripcion de Piloto</h1>
-        <p class="text-gray-light">Completa el formulario para registrarte en el campeonato Minicross Colombia 2026.</p>
-      </div>
-      <div class="card">
-        ${
-          events.length === 0
-            ? '<p class="text-center text-gray-light py-8">No hay eventos abiertos para inscripcion.</p>'
-            : renderForm(events, initialEventId, initialPilots)
-        }
-      </div>
-    </main>
-    <footer class="border-t border-secondary/20 bg-dark py-8 mt-8">
-      <div class="mx-auto max-w-7xl px-4 text-center text-sm text-gray-light">
-        <p>Minicross Colombia 2026</p>
-      </div>
-    </footer>
-  `;
-
-  initNavbar();
+function bindRegistrationForm(events: Event[]): void {
   if (events.length === 0) return;
 
   const form = document.getElementById('registration-form') as HTMLFormElement | null;
@@ -396,4 +390,53 @@ export async function initRegistrationPage(): Promise<void> {
       });
     }
   });
+}
+
+export async function initRegistrationPage(): Promise<void> {
+  const app = document.getElementById('app');
+  if (!app) return;
+
+  app.innerHTML = `
+    ${renderNavbar('inscripcion')}
+    <main class="mx-auto max-w-3xl px-4 py-12">
+      <div class="mb-8 text-center">
+        <h1 class="section-title mb-4">Inscripcion de Piloto</h1>
+        <p class="text-gray-light">Completa el formulario para registrarte en el campeonato Minicross Colombia 2026.</p>
+      </div>
+      <div class="card animate-fade-in-up" id="registration-card">
+        ${renderLoadingPanel()}
+      </div>
+    </main>
+    <footer class="border-t border-secondary/20 bg-dark py-8 mt-8">
+      <div class="mx-auto max-w-7xl px-4 text-center text-sm text-gray-light">
+        <p>Minicross Colombia 2026</p>
+      </div>
+    </footer>
+  `;
+
+  initNavbar();
+
+  const card = document.getElementById('registration-card');
+  if (!card) return;
+
+  try {
+    const events = (await loadEvents()).filter((e) => e.active);
+    const eventIdFromUrl = getEventIdFromUrl();
+    const initialEventId =
+      eventIdFromUrl && events.some((e) => e.id === eventIdFromUrl)
+        ? eventIdFromUrl
+        : events[0]?.id ?? null;
+
+    const initialPilots = initialEventId ? await getAvailablePilotNumbers(initialEventId) : [];
+
+    card.innerHTML =
+      events.length === 0
+        ? '<p class="text-center text-gray-light py-8">No hay eventos abiertos para inscripcion.</p>'
+        : renderForm(events, initialEventId, initialPilots);
+
+    bindRegistrationForm(events);
+  } catch {
+    card.innerHTML =
+      '<p class="text-center text-red-400 py-8">No se pudieron cargar los datos. Recarga la pagina e intenta de nuevo.</p>';
+  }
 }

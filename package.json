@@ -8,7 +8,10 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "prepare": "node scripts/setup-git-hooks.mjs",
-    "git:add": "node scripts/git-add-safe.mjs"
+    "git:add": "node scripts/git-add-safe.mjs",
+    "check:encoding": "node scripts/ensure-utf8.mjs",
+    "fix:encoding": "node scripts/ensure-utf8.mjs --fix",
+    "prebuild": "node scripts/ensure-utf8.mjs"
   },
   "dependencies": {
     "sweetalert2": "^11.26.25"

@@ -1,41 +1,37 @@
 /**
- * Verifica que archivos clave esten en UTF-8 (no UTF-16).
+ * Verifica (o corrige con --fix) que los archivos de texto del proyecto esten en UTF-8.
+ * Uso: node scripts/ensure-utf8.mjs [--fix]
  */
-import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { scanProject } from './utf8-encoding.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const fix = process.argv.includes('--fix');
 
-const critical = [
-  'package.json',
-  'package-lock.json',
-  '.github/workflows/deploy.yml',
-  '.gitignore',
-  'tsconfig.json',
-  'vite.config.ts',
-];
+const { utf16Files, fixed } = scanProject(root, { fix });
 
-let failed = false;
+if (fix && fixed.length) {
+  console.log(`[minicross] Convertidos a UTF-8 (${fixed.length}):`);
+  for (const rel of fixed) console.log(`  - ${rel}`);
+}
 
-for (const rel of critical) {
-  const p = path.join(root, rel);
-  if (!fs.existsSync(p)) continue;
-  const buf = fs.readFileSync(p);
-  if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) {
-    console.error(`UTF-16 detectado: ${rel}`);
-    failed = true;
-    continue;
-  }
-  if (buf.length >= 2 && buf[1] === 0x00) {
-    console.error(`UTF-16 LE detectado: ${rel}`);
-    failed = true;
+if (utf16Files.length === 0) {
+  console.log('[minicross] Todos los archivos de texto estan en UTF-8.');
+  process.exit(0);
+}
+
+if (fix) {
+  const again = scanProject(root, { fix: false });
+  if (again.utf16Files.length === 0) {
+    console.log('[minicross] Verificacion UTF-8 OK.');
+    process.exit(0);
   }
 }
 
-if (failed) {
-  console.error('\nConvierte esos archivos a UTF-8 antes de commitear.');
-  process.exit(1);
+console.error('[minicross] Archivos que no estan en UTF-8:');
+for (const { rel, enc } of utf16Files) {
+  console.error(`  - ${rel} (${enc})`);
 }
-
-console.log('[minicross] Archivos criticos en UTF-8 OK.');
+console.error('\nEjecuta: npm run fix:encoding');
+process.exit(1);

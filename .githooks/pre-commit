@@ -11,4 +11,14 @@ if [ -n "$blocked" ]; then
   exit 1
 fi
 
+if command -v node >/dev/null 2>&1; then
+  node scripts/ensure-utf8.mjs
+  if [ $? -ne 0 ]; then
+    echo ""
+    echo "Corrige con: npm run fix:encoding"
+    echo ""
+    exit 1
+  fi
+fi
+
 exit 0
