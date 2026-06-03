@@ -10,7 +10,7 @@ import {
   isApiEnabled,
 } from '../utils/storage';
 import { calculateAge, formatDate, generateId, parseSheetDate } from '../utils/age';
-import { exportRegistrationsToExcel } from '../utils/export-registrations';
+import { exportRegistrations, type ExportFormat } from '../utils/export-registrations';
 import { formatCop, resolveRegistrationTotal } from '../utils/registration-total';
 import {
   formatCategoryDisplayLabel,
@@ -221,7 +221,7 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
             <div class="flex flex-wrap items-center gap-3">
               ${
                 regs.length > 0
-                  ? `<button type="button" class="export-registrations-btn btn-outline text-sm py-2 px-4" data-event-id="${event.id}">Exportar Excel</button>`
+                  ? `<button type="button" class="export-registrations-btn btn-outline text-sm py-2 px-4" data-event-id="${event.id}">Exportar</button>`
                   : ''
               }
               <span class="text-sm text-gray-light">${regs.length} inscrito(s)</span>
@@ -373,6 +373,25 @@ async function refreshAdmin(showLoading = false): Promise<void> {
   }
 }
 
+async function promptExportFormat(): Promise<ExportFormat | null> {
+  const result = await Swal.fire({
+    title: 'Formato de exportacion',
+    text: 'En que formato deseas descargar las inscripciones?',
+    icon: 'question',
+    showCancelButton: true,
+    showDenyButton: true,
+    confirmButtonText: 'Excel (.xlsx)',
+    denyButtonText: 'CSV (.csv)',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#06b6d4',
+    denyButtonColor: '#f97316',
+  });
+
+  if (result.isConfirmed) return 'xlsx';
+  if (result.isDenied) return 'csv';
+  return null;
+}
+
 function bindAdminEvents(events: Event[], registrations: Registration[]): void {
   document.getElementById('logout-btn')?.addEventListener('click', () => {
     sessionStorage.removeItem(CONFIG.storageKeys.adminSession);
@@ -397,13 +416,17 @@ function bindAdminEvents(events: Event[], registrations: Registration[]): void {
   tabs[0]?.classList.add('ring-2', 'ring-secondary');
 
   document.querySelectorAll('.export-registrations-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const eventId = btn.getAttribute('data-event-id');
       if (!eventId) return;
       const event = events.find((e) => e.id === eventId);
       const regs = registrations.filter((r) => r.eventId === eventId);
       if (regs.length === 0) return;
-      exportRegistrationsToExcel(regs, event?.name ?? 'evento', events);
+
+      const format = await promptExportFormat();
+      if (!format) return;
+
+      exportRegistrations(regs, event?.name ?? 'evento', events, format);
     });
   });
 
