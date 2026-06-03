@@ -150,16 +150,53 @@ function renderForm(events: Event[], selectedEventId: string | null, pilotNumber
         </div>
       </div>
 
-      <div id="inscription-total" class="hidden rounded-xl border border-accent/30 bg-accent/10 p-5 space-y-2">
-        <p class="text-sm text-gray-light">
-          Valor por categoría: <span id="inscription-unit-price" class="text-secondary font-semibold">—</span>
-        </p>
-        <p class="font-title text-2xl tracking-wide text-accent">
-          Total a pagar: <span id="inscription-total-amount">—</span>
-        </p>
-        <p class="text-xs text-gray-light">
-          <span id="inscription-category-count">0</span> categoría(s) seleccionada(s)
-        </p>
+      <div id="inscription-total" class="hidden rounded-xl border border-accent/30 bg-accent/10 p-5 space-y-4">
+        <div class="space-y-2">
+          <p class="text-sm text-gray-light">
+            Valor por categoría: <span id="inscription-unit-price" class="text-secondary font-semibold">—</span>
+          </p>
+          <p class="font-title text-2xl tracking-wide text-accent">
+            Total a pagar: <span id="inscription-total-amount">—</span>
+          </p>
+          <p class="text-xs text-gray-light">
+            <span id="inscription-category-count">0</span> categoría(s) seleccionada(s)
+          </p>
+        </div>
+
+        <div class="rounded-xl border border-secondary/25 bg-primary/60 p-4 space-y-3">
+          <p class="text-sm font-semibold text-secondary uppercase tracking-wide">
+            Datos para realizar el pago
+          </p>
+          <p class="text-xs text-gray-light">
+            Transfiere el total indicado a la siguiente cuenta de ahorros y adjunta el comprobante más abajo.
+          </p>
+          <dl class="grid gap-2 sm:grid-cols-2 text-sm">
+            <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5">
+              <dt class="text-xs text-gray-light mb-0.5">Titular</dt>
+              <dd class="font-medium text-white">Cogua moto park sas</dd>
+            </div>
+            <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5">
+              <dt class="text-xs text-gray-light mb-0.5">NIT</dt>
+              <dd class="font-medium text-white font-mono">90203908</dd>
+            </div>
+            <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5">
+              <dt class="text-xs text-gray-light mb-0.5">Banco</dt>
+              <dd class="font-medium text-white">BBVA</dd>
+            </div>
+            <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5">
+              <dt class="text-xs text-gray-light mb-0.5">Tipo de cuenta</dt>
+              <dd class="font-medium text-white">Ahorros</dd>
+            </div>
+            <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5 sm:col-span-2">
+              <dt class="text-xs text-gray-light mb-0.5">Número de cuenta</dt>
+              <dd class="font-medium text-accent font-mono text-base tracking-wide">0180011666</dd>
+            </div>
+            <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5 sm:col-span-2">
+              <dt class="text-xs text-gray-light mb-0.5">Llave</dt>
+              <dd class="font-medium text-accent font-mono text-base tracking-wide">0091823623</dd>
+            </div>
+          </dl>
+        </div>
       </div>
 
       <div id="payment-section" class="hidden">
@@ -413,10 +450,15 @@ function bindRegistrationForm(events: Event[]): void {
         categoriaIds,
       });
 
+      const eventId = fd.get('eventId') as string;
+      const event = events.find((e) => e.id === eventId);
+      const eventName = event?.name ?? 'el evento';
+      const eventDate = event ? formatDate(event.date) : 'la fecha programada';
+
       await Swal.fire({
         icon: 'success',
-        title: 'Inscripción enviada',
-        text: 'Te contactaremos pronto con los detalles del evento.',
+        title: '¡Ya estás inscrito!',
+        text: `Te esperamos en ${eventName} el ${eventDate}.`,
       });
 
       form.reset();
