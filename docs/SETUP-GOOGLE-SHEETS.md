@@ -72,10 +72,12 @@ npm run build
 | Columna | Descripcion |
 |---------|-------------|
 | id | UUID unico |
-| eventId | ID del evento |
+| eventId | ID interno del evento |
+| eventName | Nombre del evento (para filtrar en la hoja) |
 | nombre / apellido | Datos del piloto |
 | identificacion | Numero de cedula |
-| identificacionArchivo | URL del documento en Drive |
+| identificacionArchivo | URL del documento de identidad en Drive |
+| comprobantePagoUrl | URL del comprobante de pago en Drive |
 | fechaNacimiento / edad | Fecha y edad calculada |
 | email / celular / ciudad | Contacto |
 | marcaMoto | Marca de la moto |

@@ -1,7 +1,7 @@
 import { CONFIG } from '../config';
 import type { AppData, Event, Registration, RegistrationFormData } from '../types';
 import { calculateAge, generateId, parseSheetDate } from './age';
-import { getCategoryById } from '../types';
+import { getCategoryById, validateCategorySelection } from '../types';
 import {
   apiGet,
   apiPost,
@@ -51,13 +51,14 @@ function normalizeRegistration(raw: Record<string, unknown>): Registration {
   return {
     id: String(raw.id ?? ''),
     eventId: String(raw.eventId ?? ''),
+    eventName: String(raw.eventName ?? ''),
     nombre: String(raw.nombre ?? ''),
     apellido: String(raw.apellido ?? ''),
     identificacion: String(raw.identificacion ?? ''),
     identificacionArchivo: String(raw.identificacionArchivo ?? raw.identificacionDriveUrl ?? ''),
     identificacionFileName: String(raw.identificacionFileName ?? ''),
     identificacionFileType: String(raw.identificacionFileType ?? ''),
-    comprobantePagoArchivo: String(raw.comprobantePagoArchivo ?? ''),
+    comprobantePagoArchivo: String(raw.comprobantePagoArchivo ?? raw.comprobantePagoUrl ?? ''),
     comprobantePagoFileName: String(raw.comprobantePagoFileName ?? ''),
     comprobantePagoFileType: String(raw.comprobantePagoFileType ?? ''),
     fechaNacimiento: String(raw.fechaNacimiento ?? ''),
@@ -181,6 +182,9 @@ function resolveCategoryFields(categoriaIds: string[]): { categoriaId: string; c
 }
 
 export async function createRegistration(data: RegistrationFormData): Promise<Registration> {
+  const categoryError = validateCategorySelection(data.categoriaIds);
+  if (categoryError) throw new Error(categoryError);
+
   const { categoriaId, categoriaLabel } = resolveCategoryFields(data.categoriaIds);
   const edad = calculateAge(data.fechaNacimiento);
   const now = new Date().toISOString();
@@ -243,7 +247,7 @@ export async function updateRegistration(
 
   const registrations = await loadRegistrations();
   const index = registrations.findIndex((r) => r.id === id);
-  if (index === -1) throw new Error('Inscripcion no encontrada.');
+  if (index === -1) throw new Error('Inscripción no encontrada.');
 
   const current = registrations[index];
   const merged = { ...current, ...updates, updatedAt: new Date().toISOString() };

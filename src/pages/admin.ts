@@ -36,12 +36,12 @@ function renderLogin(): string {
     </div>`;
 }
 
-function renderCedulaCell(reg: Registration): string {
-  const url = reg.identificacionArchivo?.trim() ?? '';
-  if (!isHttpUrl(url)) {
+function renderDocumentLinkCell(url: string | undefined, title: string, ariaLabel: string): string {
+  const link = url?.trim() ?? '';
+  if (!isHttpUrl(link)) {
     return '<span class="text-gray-light text-xs">—</span>';
   }
-  return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center text-secondary hover:text-accent" title="Ver documento" aria-label="Ver cedula">
+  return `<a href="${link}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center text-secondary hover:text-accent" title="${title}" aria-label="${ariaLabel}">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
   </a>`;
 }
@@ -56,14 +56,15 @@ function renderRegistrationRow(reg: Registration): string {
       <td class="px-3 py-3 text-sm hidden lg:table-cell">${reg.categoriaLabel}</td>
       <td class="px-3 py-3 text-sm hidden lg:table-cell">${reg.ciudad}</td>
       <td class="px-3 py-3 text-sm hidden xl:table-cell">${reg.celular}</td>
-      <td class="px-3 py-3 text-sm text-center">${renderCedulaCell(reg)}</td>
+      <td class="px-3 py-3 text-sm text-center">${renderDocumentLinkCell(reg.identificacionArchivo, 'Ver cédula', 'Ver cédula')}</td>
+      <td class="px-3 py-3 text-sm text-center">${renderDocumentLinkCell(reg.comprobantePagoArchivo, 'Ver comprobante de pago', 'Ver comprobante de pago')}</td>
       <td class="px-3 py-3 text-sm">
         <button class="edit-reg text-secondary hover:text-accent mr-2" data-id="${reg.id}">Editar</button>
         <button class="delete-reg text-orange hover:text-accent" data-id="${reg.id}">Eliminar</button>
       </td>
     </tr>
     <tr class="hidden edit-row bg-primary/40" data-edit-id="${reg.id}">
-      <td colspan="8" class="px-4 py-4">
+      <td colspan="9" class="px-4 py-4">
         <form class="edit-form grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-id="${reg.id}">
           <input type="text" name="nombre" value="${reg.nombre}" placeholder="Nombre" class="input-field text-sm" required />
           <input type="text" name="apellido" value="${reg.apellido}" placeholder="Apellido" class="input-field text-sm" required />
@@ -124,7 +125,8 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
                         <th class="px-3 py-2 hidden lg:table-cell">Categoria</th>
                         <th class="px-3 py-2 hidden lg:table-cell">Ciudad</th>
                         <th class="px-3 py-2 hidden xl:table-cell">Celular</th>
-                        <th class="px-3 py-2 text-center">Cedula</th>
+                        <th class="px-3 py-2 text-center">Cédula</th>
+                        <th class="px-3 py-2 text-center">Pago</th>
                         <th class="px-3 py-2">Acciones</th>
                       </tr>
                     </thead>
@@ -142,7 +144,7 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
         <div class="mx-auto max-w-7xl flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 class="font-title text-3xl text-accent tracking-wider">Panel Minicross 2026</h1>
-            <p class="text-sm text-gray-light">Gestion de inscripciones y eventos</p>
+            <p class="text-sm text-gray-light">Gestión de inscripciones y eventos</p>
           </div>
           <button id="logout-btn" class="btn-outline text-sm py-2 px-4">Cerrar sesion</button>
         </div>
@@ -327,7 +329,7 @@ function bindAdminEvents(events: Event[]): void {
   document.querySelectorAll('.delete-reg').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-id')!;
-      if (!confirm('Eliminar esta inscripcion?')) return;
+      if (!confirm('Eliminar esta inscripción?')) return;
       await deleteRegistration(id);
       await refreshAdmin();
     });

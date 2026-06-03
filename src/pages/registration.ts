@@ -7,7 +7,7 @@ import {
   readFileAsDataUrl,
 } from '../utils/storage';
 import { calculateAge, formatDate } from '../utils/age';
-import { getCategoriesForAge } from '../types';
+import { getCategoriesForAge, validateCategorySelection } from '../types';
 import type { Event } from '../types';
 import Swal from 'sweetalert2';
 
@@ -311,9 +311,15 @@ function bindRegistrationForm(events: Event[]): void {
     if (categoriaIds.length === 0 || !categoriaIds.every((id) => validCategories.some((c) => c.id === id))) {
       await Swal.fire({
         icon: 'error',
-        title: 'Categorias',
-        text: 'Selecciona al menos una categoria valida para tu edad.',
+        title: 'Categorías',
+        text: 'Selecciona al menos una categoría válida para tu edad.',
       });
+      return;
+    }
+
+    const categoryError = validateCategorySelection(categoriaIds);
+    if (categoryError) {
+      await Swal.fire({ icon: 'error', title: 'Categorías', text: categoryError });
       return;
     }
 
@@ -334,7 +340,7 @@ function bindRegistrationForm(events: Event[]): void {
     }
 
     Swal.fire({
-      title: 'Enviando inscripcion...',
+      title: 'Enviando inscripción...',
       allowOutsideClick: false,
       didOpen: () => Swal.showLoading(),
     });
@@ -362,7 +368,7 @@ function bindRegistrationForm(events: Event[]): void {
 
       await Swal.fire({
         icon: 'success',
-        title: 'Inscripcion enviada',
+        title: 'Inscripción enviada',
         text: 'Te contactaremos pronto con los detalles del evento.',
       });
 
@@ -386,7 +392,7 @@ function bindRegistrationForm(events: Event[]): void {
       await Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: err instanceof Error ? err.message : 'No se pudo enviar la inscripcion.',
+        text: err instanceof Error ? err.message : 'No se pudo enviar la inscripción.',
       });
     }
   });
@@ -400,7 +406,7 @@ export async function initRegistrationPage(): Promise<void> {
     ${renderNavbar('inscripcion')}
     <main class="mx-auto max-w-3xl px-4 py-12">
       <div class="mb-8 text-center">
-        <h1 class="section-title mb-4">Inscripcion de Piloto</h1>
+        <h1 class="section-title mb-4">Inscripción de Piloto</h1>
         <p class="text-gray-light">Completa el formulario para registrarte en el campeonato Minicross Colombia 2026.</p>
       </div>
       <div class="card animate-fade-in-up" id="registration-card">
@@ -431,7 +437,7 @@ export async function initRegistrationPage(): Promise<void> {
 
     card.innerHTML =
       events.length === 0
-        ? '<p class="text-center text-gray-light py-8">No hay eventos abiertos para inscripcion.</p>'
+        ? '<p class="text-center text-gray-light py-8">No hay eventos abiertos para inscripción.</p>'
         : renderForm(events, initialEventId, initialPilots);
 
     bindRegistrationForm(events);

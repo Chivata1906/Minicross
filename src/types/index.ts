@@ -40,6 +40,7 @@ export interface Event {
 export interface Registration {
   id: string;
   eventId: string;
+  eventName?: string;
   nombre: string;
   apellido: string;
   identificacion: string;
@@ -85,4 +86,25 @@ export interface RegistrationFormData {
 export interface AppData {
   events: Event[];
   registrations: Registration[];
+}
+/** No permite A y B de la misma cilindrada (ej. 65cc A + 65cc B). */
+export function validateCategorySelection(categoriaIds: string[]): string | null {
+  const lettersByDisplacement = new Map<string, Set<string>>();
+
+  for (const id of categoriaIds) {
+    if (id === '125cc-junior') continue;
+    const match = id.match(/^(\d+cc)-(a|b)$/);
+    if (!match) continue;
+    const [, displacement, letter] = match;
+    if (!lettersByDisplacement.has(displacement)) {
+      lettersByDisplacement.set(displacement, new Set());
+    }
+    const letters = lettersByDisplacement.get(displacement)!;
+    letters.add(letter);
+    if (letters.size > 1) {
+      return `No puedes inscribirte en novatos (A) y expertos (B) de la misma cilindrada (${displacement}).`;
+    }
+  }
+
+  return null;
 }

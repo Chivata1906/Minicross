@@ -12,9 +12,9 @@ const DRIVE_FOLDER_ID = '1oImoS0x__kgBBXaL9HAg3Qf-4Zj0Xz0l';
 
 const EVENT_HEADERS = ['id', 'name', 'date', 'location', 'city', 'description', 'active'];
 const REG_HEADERS = [
-  'id', 'eventId', 'nombre', 'apellido', 'identificacion',
+  'id', 'eventId', 'eventName', 'nombre', 'apellido', 'identificacion',
   'identificacionArchivo', 'identificacionFileName', 'identificacionFileType',
-  'comprobantePagoArchivo', 'comprobantePagoFileName', 'comprobantePagoFileType',
+  'comprobantePagoUrl', 'comprobantePagoFileName', 'comprobantePagoFileType',
   'fechaNacimiento', 'edad', 'email', 'celular', 'ciudad', 'marcaMoto',
   'numeroPiloto', 'categoriaId', 'categoriaLabel', 'createdAt', 'updatedAt',
 ];
@@ -92,13 +92,27 @@ function createRegistration_(ss, data) {
     };
   }
 
-  if (data.identificacionArchivo && data.identificacionArchivo.indexOf('data:') === 0) {
-    data.identificacionArchivo = saveFileToDrive_(data);
+  var categoryError = validateCategorySelection_(data.categoriaId);
+  if (categoryError) {
+    return { success: false, error: categoryError };
   }
 
+  if (data.identificacionArchivo && data.identificacionArchivo.indexOf('data:') === 0) {
+    data.identificacionArchivo = saveFileToDrive_(data, ss);
+  }
+
+  if (data.comprobantePagoArchivo && data.comprobantePagoArchivo.indexOf('data:') === 0) {
+    data.comprobantePagoUrl = saveComprobanteToDrive_(data, ss);
+  } else if (data.comprobantePagoUrl && String(data.comprobantePagoUrl).indexOf('http') === 0) {
+    // ya es URL
+  } else if (data.comprobantePagoArchivo && String(data.comprobantePagoArchivo).indexOf('http') === 0) {
+    data.comprobantePagoUrl = data.comprobantePagoArchivo;
+  }
+
+  var row = prepareRegistrationRow_(ss, data);
   const sheet = getOrCreateSheet_(ss, 'Registrations', REG_HEADERS);
-  appendRow_(sheet, REG_HEADERS, data);
-  return { success: true, registration: data };
+  appendRow_(sheet, REG_HEADERS, row);
+  return { success: true, registration: row };
 }
 
 function updateRegistration_(ss, id, updates) {
@@ -107,7 +121,7 @@ function updateRegistration_(ss, id, updates) {
 
   const rows = sheetToObjects_(sheet);
   const index = rows.findIndex(function (r) { return String(r.id) === String(id); });
-  if (index === -1) return { success: false, error: 'Inscripcion no encontrada' };
+  if (index === -1) return { success: false, error: 'Inscripción no encontrada' };
 
   const merged = {};
   REG_HEADERS.forEach(function (h) {
@@ -115,6 +129,14 @@ function updateRegistration_(ss, id, updates) {
   });
   merged.id = id;
   merged.updatedAt = new Date().toISOString();
+  if (updates.eventId !== undefined) {
+    merged.eventName = getEventNameById_(ss, merged.eventId);
+  } else if (!merged.eventName && merged.eventId) {
+    merged.eventName = getEventNameById_(ss, merged.eventId);
+  }
+  if (merged.comprobantePagoArchivo && String(merged.comprobantePagoArchivo).indexOf('http') === 0) {
+    merged.comprobantePagoUrl = merged.comprobantePagoArchivo;
+  }
 
   if (
     updates.numeroPiloto !== undefined &&
@@ -137,7 +159,7 @@ function deleteRegistration_(ss, id) {
 
   const rows = sheetToObjects_(sheet);
   const index = rows.findIndex(function (r) { return String(r.id) === String(id); });
-  if (index === -1) return { success: false, error: 'Inscripcion no encontrada' };
+  if (index === -1) return { success: false, error: 'Inscripción no encontrada' };
 
   sheet.deleteRow(index + 2);
   return { success: true };
@@ -162,15 +184,81 @@ function isPilotNumberAvailable_(ss, eventId, numero, excludeId) {
 
 // ─── Drive: guardar documento de identidad ───────────────────────────────────
 
-function saveFileToDrive_(data) {
+
+function prepareRegistrationRow_(ss, data) {
+  var row = {};
+  REG_HEADERS.forEach(function (h) {
+    row[h] = data[h] !== undefined && data[h] !== null ? data[h] : '';
+  });
+  row.eventName = getEventNameById_(ss, data.eventId);
+  if (!row.comprobantePagoUrl && data.comprobantePagoArchivo && String(data.comprobantePagoArchivo).indexOf('http') === 0) {
+    row.comprobantePagoUrl = data.comprobantePagoArchivo;
+  }
+  return row;
+}
+
+function validateCategorySelection_(categoriaId) {
+  if (!categoriaId) return null;
+  var ids = String(categoriaId).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+  var groups = {};
+  for (var i = 0; i < ids.length; i++) {
+    var id = ids[i];
+    if (id === '125cc-junior') continue;
+    var m = id.match(/^(\d+cc)-(a|b)$/);
+    if (!m) continue;
+    var disp = m[1];
+    var letter = m[2];
+    if (!groups[disp]) groups[disp] = {};
+    groups[disp][letter] = true;
+    if (groups[disp].a && groups[disp].b) {
+      return 'No puedes inscribirte en novatos (A) y expertos (B) de la misma cilindrada (' + disp + ').';
+    }
+  }
+  return null;
+}
+
+function getEventNameById_(ss, eventId) {
+  var events = getEvents_(ss);
+  for (var i = 0; i < events.length; i++) {
+    if (String(events[i].id) === String(eventId)) return events[i].name;
+  }
+  return 'Evento';
+}
+
+function sanitizeFileNamePart_(value) {
+  return String(value || 'sin_dato')
+    .trim()
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .substring(0, 80);
+}
+
+function getFileExtension_(fileName, mimeType) {
+  var m = String(fileName || '').match(/\.([a-zA-Z0-9]{1,8})$/);
+  if (m) return m[1].toLowerCase();
+  if (mimeType && mimeType.indexOf('pdf') >= 0) return 'pdf';
+  if (mimeType && mimeType.indexOf('jpeg') >= 0) return 'jpg';
+  if (mimeType && mimeType.indexOf('png') >= 0) return 'png';
+  return 'bin';
+}
+
+function buildDriveFileName_(identificacion, eventName, suffix, originalFileName, mimeType) {
+  var ext = getFileExtension_(originalFileName, mimeType);
+  return sanitizeFileNamePart_(identificacion) + '_' + sanitizeFileNamePart_(eventName) + '_' + suffix + '.' + ext;
+}
+
+function saveFileToDrive_(data, ss) {
   try {
     var folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
     var parts = data.identificacionArchivo.split(',');
     var base64 = parts.length > 1 ? parts[1] : parts[0];
+    var eventName = getEventNameById_(ss, data.eventId);
+    var fileName = buildDriveFileName_(data.identificacion, eventName, 'ID', data.identificacionFileName, data.identificacionFileType);
     var blob = Utilities.newBlob(
       Utilities.base64Decode(base64),
       data.identificacionFileType || 'application/octet-stream',
-      data.identificacionFileName || 'documento'
+      fileName
     );
     var file = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -211,15 +299,17 @@ function getAvailablePilotNumbers_(ss, eventId) {
   return numbers;
 }
 
-function saveComprobanteToDrive_(data) {
+function saveComprobanteToDrive_(data, ss) {
   try {
     var folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
     var parts = data.comprobantePagoArchivo.split(',');
     var base64 = parts.length > 1 ? parts[1] : parts[0];
+    var eventName = getEventNameById_(ss, data.eventId);
+    var fileName = buildDriveFileName_(data.identificacion, eventName, 'PROOF', data.comprobantePagoFileName, data.comprobantePagoFileType);
     var blob = Utilities.newBlob(
       Utilities.base64Decode(base64),
       data.comprobantePagoFileType || 'application/octet-stream',
-      data.comprobantePagoFileName || 'comprobante-pago'
+      fileName
     );
     var file = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -268,8 +358,35 @@ function getOrCreateSheet_(ss, name, headers) {
     sheet.appendRow(headers);
     sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
     sheet.setFrozenRows(1);
+  } else if (name === 'Registrations') {
+    syncRegistrationHeaders_(ss, sheet, headers);
   }
   return sheet;
+}
+
+function syncRegistrationHeaders_(ss, sheet, headers) {
+  var data = sheet.getDataRange().getValues();
+  if (data.length === 0) {
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+    return;
+  }
+
+  var current = data[0].map(function (h) { return String(h); });
+  var needsSync = headers.some(function (h) { return current.indexOf(h) === -1; });
+  if (!needsSync) return;
+
+  var rows = sheetToObjects_(sheet);
+  rows.forEach(function (row) {
+    if (!row.eventName && row.eventId) {
+      row.eventName = getEventNameById_(ss, row.eventId);
+    }
+    if (!row.comprobantePagoUrl && row.comprobantePagoArchivo && String(row.comprobantePagoArchivo).indexOf('http') === 0) {
+      row.comprobantePagoUrl = row.comprobantePagoArchivo;
+    }
+  });
+  writeObjects_(sheet, headers, rows);
 }
 
 function sheetToObjects_(sheet) {
