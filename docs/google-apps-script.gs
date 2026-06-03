@@ -10,7 +10,7 @@
 const SPREADSHEET_ID = '1g5crmfmbcxyvmLMXxYECxO90gFYiXf7P5JaSze7pmbI';
 const DRIVE_FOLDER_ID = '1oImoS0x__kgBBXaL9HAg3Qf-4Zj0Xz0l';
 
-const EVENT_HEADERS = ['id', 'name', 'date', 'location', 'city', 'description', 'active', 'reglamentoUrl', 'finished'];
+const EVENT_HEADERS = ['id', 'name', 'date', 'location', 'city', 'description', 'active', 'reglamentoUrl', 'finished', 'valorInscripcion'];
 const REG_HEADERS = [
   'id', 'eventId', 'eventName', 'nombre', 'apellido', 'identificacion',
   'identificacionArchivo', 'identificacionFileName', 'identificacionFileType',
@@ -90,11 +90,6 @@ function createRegistration_(ss, data) {
       success: false,
       error: 'El numero de piloto ' + data.numeroPiloto + ' ya esta registrado en este evento.',
     };
-  }
-
-  var categoryError = validateCategorySelection_(data.categoriaId);
-  if (categoryError) {
-    return { success: false, error: categoryError };
   }
 
   if (data.identificacionArchivo && data.identificacionArchivo.indexOf('data:') === 0) {
@@ -216,23 +211,7 @@ function prepareRegistrationRow_(ss, data) {
   return row;
 }
 
-function validateCategorySelection_(categoriaId) {
-  if (!categoriaId) return null;
-  var ids = String(categoriaId).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
-  var groups = {};
-  for (var i = 0; i < ids.length; i++) {
-    var id = ids[i];
-    if (id === '125cc-junior') continue;
-    var m = id.match(/^(\d+cc)-(a|b)$/);
-    if (!m) continue;
-    var disp = m[1];
-    var letter = m[2];
-    if (!groups[disp]) groups[disp] = {};
-    groups[disp][letter] = true;
-    if (groups[disp].a && groups[disp].b) {
-      return 'No puedes inscribirte en novatos (A) y expertos (B) de la misma cilindrada (' + disp + ').';
-    }
-  }
+function validateCategorySelection_(_categoriaId) {
   return null;
 }
 
@@ -445,6 +424,7 @@ function prepareEventRow_(ss, data) {
   row.date = parseSheetDate_(row.date);
   row.active = parseBoolField_(row.active);
   row.finished = parseBoolField_(row.finished);
+  row.valorInscripcion = Number(row.valorInscripcion) || 0;
   if (data.reglamentoArchivo && String(data.reglamentoArchivo).indexOf('data:') === 0) {
     row.reglamentoUrl = saveReglamentoToDrive_(data, ss);
   } else if (data.reglamentoUrl && String(data.reglamentoUrl).indexOf('http') === 0) {

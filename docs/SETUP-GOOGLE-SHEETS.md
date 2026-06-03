@@ -79,6 +79,7 @@ npm run build
 | active | Habilitado para inscripciones (true/false) |
 | reglamentoUrl | URL del PDF del reglamento en Drive |
 | finished | Evento finalizado; habilita boton Ver resultados (true/false) |
+| valorInscripcion | Valor de inscripcion por categoria (COP, numero) |
 
 Si agregaste columnas manualmente, ejecuta **repairEventsSheet** o **repairAllSheets** en Apps Script (deben aparecer en el selector de funciones tras pegar el script actualizado).
 

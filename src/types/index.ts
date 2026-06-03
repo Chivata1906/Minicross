@@ -8,16 +8,33 @@ export interface Category {
   maxAge: number;
 }
 
+/** IDs legacy (A/B) → IDs actuales por rango de edad. */
+const LEGACY_CATEGORY_IDS: Record<string, string> = {
+  '50cc-a': '50cc-4-6',
+  '50cc-b': '50cc-6-8',
+  '65cc-a': '65cc-7-9',
+  '65cc-b': '65cc-8-10',
+  '85cc-a': '85cc-9-11',
+  '85cc-b': '85cc-11-13',
+};
+
 export const CATEGORIES: Category[] = [
-  { id: '50cc-a', label: '50cc A', minAge: 4, maxAge: 6 },
-  { id: '50cc-b', label: '50cc B', minAge: 6, maxAge: 8 },
-  { id: '65cc-a', label: '65cc A', minAge: 7, maxAge: 9 },
-  { id: '65cc-b', label: '65cc B', minAge: 8, maxAge: 10 },
-  { id: '85cc-a', label: '85cc A', minAge: 9, maxAge: 11 },
-  { id: '85cc-b', label: '85cc B', minAge: 11, maxAge: 13 },
+  { id: '50cc-4-6', label: '50cc', minAge: 4, maxAge: 6 },
+  { id: '50cc-6-8', label: '50cc', minAge: 6, maxAge: 8 },
+  { id: '65cc-7-9', label: '65cc', minAge: 7, maxAge: 9 },
+  { id: '65cc-8-10', label: '65cc', minAge: 8, maxAge: 10 },
+  { id: '85cc-9-11', label: '85cc', minAge: 9, maxAge: 11 },
+  { id: '85cc-11-13', label: '85cc', minAge: 11, maxAge: 13 },
   { id: '125cc-junior', label: '125cc Junior', minAge: 12, maxAge: 17 },
 ];
 
+export function resolveCategoryId(id: string): string {
+  return LEGACY_CATEGORY_IDS[id] ?? id;
+}
+
+export function formatCategoryOptionLabel(category: Category): string {
+  return `${category.label} (${category.minAge} – ${category.maxAge} años)`;
+}
 
 export function formatCategoryDisplayLabel(categoriaId: string, fallbackLabel = ''): string {
   const ids = categoriaId.split(',').map((id) => id.trim()).filter(Boolean);
@@ -26,7 +43,7 @@ export function formatCategoryDisplayLabel(categoriaId: string, fallbackLabel = 
       .map((id) => {
         const cat = getCategoryById(id);
         if (!cat) return fallbackLabel || id;
-        return `${cat.label} (${cat.minAge} a ${cat.maxAge} años)`;
+        return formatCategoryOptionLabel(cat);
       })
       .join(' | ');
   }
@@ -34,7 +51,8 @@ export function formatCategoryDisplayLabel(categoriaId: string, fallbackLabel = 
 }
 
 export function getCategoryById(id: string): Category | undefined {
-  return CATEGORIES.find((c) => c.id === id);
+  const resolved = resolveCategoryId(id);
+  return CATEGORIES.find((c) => c.id === resolved);
 }
 
 export function getCategoriesForAge(age: number): Category[] {
@@ -52,6 +70,7 @@ export interface Event {
   active: boolean;
   finished: boolean;
   reglamentoUrl: string;
+  valorInscripcion: number;
 }
 
 /** Campos temporales al guardar (PDF en base64, no van a la hoja). */
@@ -111,24 +130,8 @@ export interface AppData {
   events: Event[];
   registrations: Registration[];
 }
-/** No permite A y B de la misma cilindrada (ej. 65cc A + 65cc B). */
-export function validateCategorySelection(categoriaIds: string[]): string | null {
-  const lettersByDisplacement = new Map<string, Set<string>>();
 
-  for (const id of categoriaIds) {
-    if (id === '125cc-junior') continue;
-    const match = id.match(/^(\d+cc)-(a|b)$/);
-    if (!match) continue;
-    const [, displacement, letter] = match;
-    if (!lettersByDisplacement.has(displacement)) {
-      lettersByDisplacement.set(displacement, new Set());
-    }
-    const letters = lettersByDisplacement.get(displacement)!;
-    letters.add(letter);
-    if (letters.size > 1) {
-      return `No puedes inscribirte en novatos (A) y expertos (B) de la misma cilindrada (${displacement}).`;
-    }
-  }
-
+/** Sin restricción A/B: solo aplica elegibilidad por edad al seleccionar. */
+export function validateCategorySelection(_categoriaIds: string[]): string | null {
   return null;
 }

@@ -8,8 +8,7 @@ import {
   readFileAsDataUrl,
 } from '../utils/storage';
 import { calculateAge, formatDate } from '../utils/age';
-import { getCategoriesForAge, validateCategorySelection } from '../types';
-import type { Event } from '../types';
+import { getCategoriesForAge, formatCategoryOptionLabel, type Event } from '../types';
 import Swal from 'sweetalert2';
 
 let idFileData = '';
@@ -34,7 +33,7 @@ function renderCategoryCheckboxes(age: number, selected: string[] = []): string 
         (c) => `
       <label class="flex items-center gap-3 rounded-lg border border-secondary/20 bg-primary/40 px-4 py-3 cursor-pointer hover:border-secondary/50">
         <input type="checkbox" name="categoriaIds" value="${c.id}" class="accent-secondary h-4 w-4" ${selected.includes(c.id) ? 'checked' : ''} />
-        <span class="text-sm font-medium">${c.label}</span>
+        <span class="text-sm font-medium">${formatCategoryOptionLabel(c)}</span>
       </label>`
       )
       .join('')}
@@ -67,6 +66,14 @@ function renderLoadingPanel(): string {
         <span class="h-2 w-2 animate-pulse rounded-full bg-secondary" style="animation-delay: 300ms"></span>
       </div>
     </div>`;
+}
+
+function formatCop(amount: number): string {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
 function renderForm(events: Event[], selectedEventId: string | null, pilotNumbers: number[]): string {
@@ -106,13 +113,6 @@ function renderForm(events: Event[], selectedEventId: string | null, pilotNumber
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-secondary mb-2" for="paymentFile">Comprobante de pago (foto o PDF, max. ${CONFIG.maxFileSizeMB} MB) *</label>
-        <input type="file" id="paymentFile" accept="image/*,.pdf" required
-               class="w-full rounded-xl border border-dashed border-secondary/40 bg-primary/40 px-4 py-3 text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-secondary file:px-4 file:py-2 file:font-semibold file:text-primary" />
-        <p id="payment-preview" class="mt-2 text-sm text-gray-light hidden"></p>
-      </div>
-
-      <div>
         <label class="block text-sm font-medium text-secondary mb-2" for="fechaNacimiento">Fecha de nacimiento *</label>
         <input type="date" id="fechaNacimiento" name="fechaNacimiento" required class="input-field" />
         <p id="age-display" class="mt-2 text-sm text-accent font-semibold hidden"></p>
@@ -148,12 +148,32 @@ function renderForm(events: Event[], selectedEventId: string | null, pilotNumber
           </select>
           <p id="pilot-status" class="mt-1 text-xs text-gray-light">Selecciona un evento para ver numeros disponibles.</p>
         </div>
-        <div>
-          <label class="block text-sm font-medium text-secondary mb-2">Categorias * (puedes elegir mas de una si aplica)</label>
-          <div id="categoria-container" class="opacity-60 pointer-events-none">
-            <p class="text-sm text-gray-light">Primero ingresa tu fecha de nacimiento</p>
-          </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-secondary mb-2">Categorias * (puedes elegir mas de una si aplica)</label>
+        <div id="categoria-container" class="opacity-60 pointer-events-none">
+          <p class="text-sm text-gray-light">Primero ingresa tu fecha de nacimiento</p>
         </div>
+      </div>
+
+      <div id="inscription-total" class="hidden rounded-xl border border-accent/30 bg-accent/10 p-5 space-y-2">
+        <p class="text-sm text-gray-light">
+          Valor por categoría: <span id="inscription-unit-price" class="text-secondary font-semibold">—</span>
+        </p>
+        <p class="font-title text-2xl tracking-wide text-accent">
+          Total a pagar: <span id="inscription-total-amount">—</span>
+        </p>
+        <p class="text-xs text-gray-light">
+          <span id="inscription-category-count">0</span> categoría(s) seleccionada(s)
+        </p>
+      </div>
+
+      <div id="payment-section" class="hidden">
+        <label class="block text-sm font-medium text-secondary mb-2" for="paymentFile">Comprobante de pago (foto o PDF, max. ${CONFIG.maxFileSizeMB} MB) *</label>
+        <input type="file" id="paymentFile" accept="image/*,.pdf" required
+               class="w-full rounded-xl border border-dashed border-secondary/40 bg-primary/40 px-4 py-3 text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-secondary file:px-4 file:py-2 file:font-semibold file:text-primary" />
+        <p id="payment-preview" class="mt-2 text-sm text-gray-light hidden"></p>
       </div>
 
       <button type="submit" class="btn-primary w-full text-lg py-4">Enviar inscripción</button>
@@ -192,7 +212,7 @@ async function refreshPilotSelect(eventId: string): Promise<void> {
   }
 }
 
-function updateCategories(age: number): void {
+function updateCategories(age: number, events: Event[]): void {
   const container = document.getElementById('categoria-container');
   const ageDisplay = document.getElementById('age-display');
   if (!container || !ageDisplay) return;
@@ -211,6 +231,36 @@ function updateCategories(age: number): void {
   container.classList.toggle('opacity-60', categories.length === 0);
   container.classList.toggle('pointer-events-none', categories.length === 0);
   container.innerHTML = renderCategoryCheckboxes(age);
+  updateInscriptionTotal(events);
+}
+
+function updateInscriptionTotal(events: Event[]): void {
+  const eventSelect = document.getElementById('eventId') as HTMLSelectElement | null;
+  const totalBlock = document.getElementById('inscription-total');
+  const paymentSection = document.getElementById('payment-section');
+  const unitPriceEl = document.getElementById('inscription-unit-price');
+  const totalAmountEl = document.getElementById('inscription-total-amount');
+  const countEl = document.getElementById('inscription-category-count');
+  if (!eventSelect || !totalBlock || !paymentSection || !unitPriceEl || !totalAmountEl || !countEl) return;
+
+  const event = events.find((e) => e.id === eventSelect.value);
+  const selectedCount = getSelectedCategoryIds().length;
+  const unitPrice = event?.valorInscripcion ?? 0;
+  const total = unitPrice * selectedCount;
+
+  if (selectedCount > 0 && event) {
+    totalBlock.classList.remove('hidden');
+    paymentSection.classList.remove('hidden');
+    unitPriceEl.textContent = formatCop(unitPrice);
+    totalAmountEl.textContent = formatCop(total);
+    countEl.textContent = String(selectedCount);
+  } else {
+    totalBlock.classList.add('hidden');
+    paymentSection.classList.add('hidden');
+    unitPriceEl.textContent = '—';
+    totalAmountEl.textContent = '—';
+    countEl.textContent = '0';
+  }
 }
 
 function getSelectedCategoryIds(): string[] {
@@ -252,13 +302,22 @@ function bindRegistrationForm(events: Event[]): void {
   const birthInput = document.getElementById('fechaNacimiento') as HTMLInputElement | null;
   const fileInput = document.getElementById('idFile') as HTMLInputElement | null;
   const paymentInput = document.getElementById('paymentFile') as HTMLInputElement | null;
+  const categoriaContainer = document.getElementById('categoria-container');
 
   eventSelect?.addEventListener('change', () => {
     if (eventSelect.value) void refreshPilotSelect(eventSelect.value);
+    updateInscriptionTotal(events);
   });
 
   birthInput?.addEventListener('change', () => {
-    if (birthInput.value) updateCategories(calculateAge(birthInput.value));
+    if (birthInput.value) updateCategories(calculateAge(birthInput.value), events);
+  });
+
+  categoriaContainer?.addEventListener('change', (e) => {
+    const target = e.target as HTMLElement;
+    if (target instanceof HTMLInputElement && target.name === 'categoriaIds') {
+      updateInscriptionTotal(events);
+    }
   });
 
   fileInput?.addEventListener('change', () => {
@@ -318,13 +377,7 @@ function bindRegistrationForm(events: Event[]): void {
       return;
     }
 
-    const categoryError = validateCategorySelection(categoriaIds);
-    if (categoryError) {
-      await Swal.fire({ icon: 'error', title: 'Categorías', text: categoryError });
-      return;
-    }
-
-    if (!idFileData) {
+    if (!paymentFileData) {
       await Swal.fire({ icon: 'error', title: 'Documento', text: 'Debes adjuntar el documento de identidad.' });
       return;
     }
@@ -388,6 +441,7 @@ function bindRegistrationForm(events: Event[]): void {
         container.classList.add('opacity-60', 'pointer-events-none');
         container.innerHTML = '<p class="text-sm text-gray-light">Primero ingresa tu fecha de nacimiento</p>';
       }
+      updateInscriptionTotal(events);
       if (eventSelect?.value) await refreshPilotSelect(eventSelect.value);
     } catch (err) {
       await Swal.fire({

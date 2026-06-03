@@ -8,7 +8,8 @@
     "description": "Primera valida del campeonato. Triple Corona: 3 mangas.",
     "active": true,
     "finished": false,
-    "reglamentoUrl": ""
+    "reglamentoUrl": "",
+    "valorInscripcion": 0
   },
   {
     "id": "evt-002",
@@ -19,6 +20,7 @@
     "description": "Segunda valida del campeonato.",
     "active": true,
     "finished": false,
-    "reglamentoUrl": ""
+    "reglamentoUrl": "",
+    "valorInscripcion": 0
   }
 ]

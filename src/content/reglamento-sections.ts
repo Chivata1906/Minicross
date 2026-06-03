@@ -37,12 +37,12 @@ export const REGLAMENTO_SECTIONS: ReglamentoSection[] = [
     table: {
       headers: ['Categoría', 'Edad'],
       rows: [
-        ['50cc A', '4 a 6 años'],
-        ['50cc B', '6 a 8 años'],
-        ['65cc A', '7 a 9 años'],
-        ['65cc B', '8 a 10 años'],
-        ['85cc A', '9 a 11 años'],
-        ['85cc B', '11 a 13 años'],
+        ['50cc', '4 a 6 años'],
+        ['50cc', '6 a 8 años'],
+        ['65cc', '7 a 9 años'],
+        ['65cc', '8 a 10 años'],
+        ['85cc', '9 a 11 años'],
+        ['85cc', '11 a 13 años'],
         ['125cc Junior', '12 a 17 años'],
       ],
     },

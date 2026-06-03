@@ -31,7 +31,7 @@ Plataforma web del **Campeonato Junior Minicross Colombia 2026**: portal de insc
 ### Validaciones de inscripción
 
 - Edad calculada desde fecha de nacimiento; categorías filtradas automáticamente
-- Reglas de categorías (no mezclar 50cc A/B, no 65cc A/B, etc.)
+- Reglas de categorías por edad (puedes inscribirte en todas las categorías válidas para tu edad)
 - Números de piloto del **4 al 999**, únicos por evento
 - Al enviar, el backend rechaza números ya tomados con mensaje de error claro
 - Archivos con límite de tamaño configurable (`maxFileSizeMB` en `src/config.ts`)
@@ -201,12 +201,12 @@ Todo el código fuente debe estar en **UTF-8** (`.editorconfig`, `.vscode/settin
 
 | Categoría | Edad |
 |-----------|------|
-| 50cc A | 4 – 6 años |
-| 50cc B | 6 – 8 años |
-| 65cc A | 7 – 9 años |
-| 65cc B | 8 – 10 años |
-| 85cc A | 9 – 11 años |
-| 85cc B | 11 – 13 años |
+| 50cc | 4 – 6 años |
+| 50cc | 6 – 8 años |
+| 65cc | 7 – 9 años |
+| 65cc | 8 – 10 años |
+| 85cc | 9 – 11 años |
+| 85cc | 11 – 13 años |
 | 125cc Junior | 12 – 17 años |
 
 Edad mínima: primer día del evento. Edad máxima: cumplida al 1 de enero del año del campeonato (según reglamento).

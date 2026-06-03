@@ -1,7 +1,7 @@
 import { CONFIG } from '../config';
 import type { AppData, Event, EventSavePayload, Registration, RegistrationFormData } from '../types';
 import { calculateAge, generateId, parseSheetDate } from './age';
-import { getCategoryById, validateCategorySelection } from '../types';
+import { getCategoryById, formatCategoryOptionLabel, validateCategorySelection } from '../types';
 import {
   apiGet,
   apiPost,
@@ -49,6 +49,7 @@ function normalizeEvent(raw: Record<string, unknown>): Event {
     active: parseBoolField(raw.active),
     finished: parseBoolField(raw.finished),
     reglamentoUrl: String(raw.reglamentoUrl ?? ''),
+    valorInscripcion: Number(raw.valorInscripcion ?? 0) || 0,
   };
 }
 
@@ -179,7 +180,10 @@ export async function getAvailablePilotNumbers(eventId: string): Promise<number[
 }
 
 function resolveCategoryFields(categoriaIds: string[]): { categoriaId: string; categoriaLabel: string } {
-  const labels = categoriaIds.map((id) => getCategoryById(id)?.label ?? id);
+  const labels = categoriaIds.map((id) => {
+    const cat = getCategoryById(id);
+    return cat ? formatCategoryOptionLabel(cat) : id;
+  });
   return {
     categoriaId: categoriaIds.join(','),
     categoriaLabel: labels.join('|'),
@@ -274,7 +278,12 @@ export async function updateRegistration(
     const categoryError = validateCategorySelection(categoryIds);
     if (categoryError) throw new Error(categoryError);
     merged.categoriaId = categoryIds.join(',');
-    merged.categoriaLabel = categoryIds.map((id) => getCategoryById(id)?.label ?? id).join('|');
+    merged.categoriaLabel = categoryIds
+      .map((id) => {
+        const cat = getCategoryById(id);
+        return cat ? formatCategoryOptionLabel(cat) : id;
+      })
+      .join('|');
   }
 
   registrations[index] = merged;

@@ -38,6 +38,18 @@ export function initHomePage(): void {
     <section class="border-y border-secondary/20 bg-dark/50 py-16">
       <div class="mx-auto max-w-7xl px-4">
         <h2 class="section-title text-center mb-12">¿Qué es el Minicross?</h2>
+        <div class="mx-auto max-w-3xl text-center text-gray-light leading-relaxed space-y-4 mb-12">
+          <p>
+            El Minicross es un campeonato creado para fortalecer e impulsar el semillero del motocross en Colombia.
+            Su propósito es brindar a niños y jóvenes un espacio seguro, organizado y competitivo donde puedan
+            desarrollar sus habilidades deportivas, adquirir experiencia y crecer dentro de este apasionante deporte.
+          </p>
+          <p>
+            Creemos que la formación de nuevas generaciones es la base para garantizar un motocross fuerte,
+            competitivo y sostenible en el tiempo. Por eso, el campeonato está diseñado bajo los más altos
+            estándares de organización, seguridad y calidad, tanto en las pistas como en cada uno de los eventos.
+          </p>
+        </div>
         <div class="grid gap-8 md:grid-cols-3">
           <div class="card text-center">
             <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-secondary/20 text-3xl">🏍️</div>
@@ -64,12 +76,12 @@ export function initHomePage(): void {
         <p class="text-center text-gray-light mb-10 max-w-2xl mx-auto">Compite en la categoría que corresponda a tu edad al momento del evento.</p>
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           ${[
-            ['50cc A', '4 – 6 años'],
-            ['50cc B', '6 – 8 años'],
-            ['65cc A', '7 – 9 años'],
-            ['65cc B', '8 – 10 años'],
-            ['85cc A', '9 – 11 años'],
-            ['85cc B', '11 – 13 años'],
+            ['50cc', '4 – 6 años'],
+            ['50cc', '6 – 8 años'],
+            ['65cc', '7 – 9 años'],
+            ['65cc', '8 – 10 años'],
+            ['85cc', '9 – 11 años'],
+            ['85cc', '11 – 13 años'],
             ['125cc Junior', '12 – 17 años'],
           ]
             .map(

@@ -12,9 +12,9 @@ import {
 import { calculateAge, formatDate, generateId, parseSheetDate } from '../utils/age';
 import {
   formatCategoryDisplayLabel,
+  formatCategoryOptionLabel,
   getCategoriesForAge,
   getCategoryById,
-  validateCategorySelection,
 } from '../types';
 import type { Event, EventSavePayload, Registration } from '../types';
 import Swal from 'sweetalert2';
@@ -114,7 +114,7 @@ function renderCategoryCheckboxes(age: number, selected: string[] = []): string 
         (c) => `
       <label class="flex items-center gap-3 rounded-lg border border-secondary/20 bg-primary/40 px-3 py-2 cursor-pointer hover:border-secondary/50">
         <input type="checkbox" name="categoriaIds" value="${c.id}" class="accent-secondary h-4 w-4" ${selected.includes(c.id) ? 'checked' : ''} />
-        <span class="text-sm font-medium">${c.label}</span>
+        <span class="text-sm font-medium">${formatCategoryOptionLabel(c)}</span>
       </label>`
       )
       .join('')}
@@ -306,6 +306,7 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
               <input type="date" id="event-date" class="input-field" required />
               <input type="text" id="event-location" placeholder="Ubicacion / Pista" class="input-field" required />
               <input type="text" id="event-city" placeholder="Ciudad" class="input-field" required />
+              <input type="number" id="event-valor-inscripcion" placeholder="Valor inscripción (COP)" class="input-field" min="0" step="1000" required />
             </div>
             <textarea id="event-description" placeholder="Descripcion" class="input-field" rows="2" required></textarea>
             <div>
@@ -425,6 +426,7 @@ function bindAdminEvents(events: Event[]): void {
   document.getElementById('add-event-btn')?.addEventListener('click', () => {
     eventForm.classList.remove('hidden');
     (document.getElementById('event-form-id') as HTMLInputElement).value = '';
+    (document.getElementById('event-valor-inscripcion') as HTMLInputElement).value = '0';
     eventForm.reset();
     document.getElementById('event-reglamento-preview')?.classList.add('hidden');
     document.getElementById('event-reglamento-current')?.classList.add('hidden');
@@ -445,6 +447,9 @@ function bindAdminEvents(events: Event[]): void {
       (document.getElementById('event-location') as HTMLInputElement).value = event.location;
       (document.getElementById('event-city') as HTMLInputElement).value = event.city;
       (document.getElementById('event-description') as HTMLTextAreaElement).value = event.description;
+      (document.getElementById('event-valor-inscripcion') as HTMLInputElement).value = String(
+        event.valorInscripcion ?? 0
+      );
       (document.getElementById('event-finished') as HTMLInputElement).checked = event.finished;
       const reglamentoInput = document.getElementById('event-reglamento') as HTMLInputElement;
       const reglamentoPreview = document.getElementById('event-reglamento-preview');
@@ -516,6 +521,7 @@ function bindAdminEvents(events: Event[]): void {
       location: (document.getElementById('event-location') as HTMLInputElement).value,
       city: (document.getElementById('event-city') as HTMLInputElement).value,
       description: (document.getElementById('event-description') as HTMLTextAreaElement).value,
+      valorInscripcion: Number((document.getElementById('event-valor-inscripcion') as HTMLInputElement).value) || 0,
       active: existing?.active ?? true,
       finished: (document.getElementById('event-finished') as HTMLInputElement).checked,
       reglamentoUrl: existing?.reglamentoUrl ?? '',
@@ -605,13 +611,9 @@ function bindAdminEvents(events: Event[]): void {
         return;
       }
 
-      const categoryError = validateCategorySelection(categoriaIds);
-      if (categoryError) {
-        await showError('Categorias', categoryError);
-        return;
-      }
-
-      const categoriaLabel = categoriaIds.map((cid) => getCategoryById(cid)?.label ?? cid).join('|');
+      const categoriaLabel = categoriaIds
+        .map((cid) => (getCategoryById(cid) ? formatCategoryOptionLabel(getCategoryById(cid)!) : cid))
+        .join('|');
 
       showSaving('Guardando inscripcion...');
       try {
