@@ -303,7 +303,8 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
             <textarea id="event-description" placeholder="Descripcion" class="input-field" rows="2" required></textarea>
             <div>
               <label class="block text-sm text-secondary mb-2" for="event-reglamento">Reglamento (PDF)</label>
-              <input type="file" id="event-reglamento" accept=".pdf,application/pdf" class="input-field text-sm" />
+              <input type="file" id="event-reglamento" accept=".pdf,application/pdf"
+                class="w-full rounded-xl border border-dashed border-secondary/40 bg-primary/40 px-4 py-3 text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-secondary file:px-4 file:py-2 file:font-semibold file:text-primary" />
               <p id="event-reglamento-preview" class="mt-2 text-xs text-gray-light hidden"></p>
               <p id="event-reglamento-current" class="mt-2 text-xs text-secondary hidden"></p>
             </div>

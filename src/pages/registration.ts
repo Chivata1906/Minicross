@@ -98,7 +98,7 @@ function renderForm(events: Event[], selectedEventId: string | null, pilotNumber
       <div>
         <label class="block text-sm font-medium text-secondary mb-2" for="identificacion">Numero de identificacion *</label>
         <input type="text" id="identificacion" name="identificacion" required class="input-field mb-3" placeholder="Ej: 1234567890" />
-        <label class="block text-sm font-medium text-gray-light mb-2" for="idFile">Documento de identidad (foto o PDF, max. ${CONFIG.maxFileSizeMB} MB) *</label>
+        <label class="block text-sm font-medium text-secondary mb-2" for="idFile">Documento de identidad (foto o PDF, max. ${CONFIG.maxFileSizeMB} MB) *</label>
         <input type="file" id="idFile" accept="image/*,.pdf" required
                class="w-full rounded-xl border border-dashed border-secondary/40 bg-primary/40 px-4 py-3 text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-secondary file:px-4 file:py-2 file:font-semibold file:text-primary" />
         <p id="file-preview" class="mt-2 text-sm text-gray-light hidden"></p>
