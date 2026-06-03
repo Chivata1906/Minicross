@@ -1,3 +1,4 @@
+import { renderFooter } from '../components/footer';
 import { renderNavbar, initNavbar } from '../components/navbar';
 import {
   REGLAMENTO_SECTIONS,
@@ -135,9 +136,7 @@ export function initReglamentoPage(): void {
         <div class="space-y-8">${sectionsHtml}</div>
       </div>
     </main>
-    <footer class="border-t border-secondary/20 py-8 text-center text-sm text-gray-light">
-      <p>© ${new Date().getFullYear()} Minicross Colombia · Cogua Moto Park</p>
-    </footer>
+    ${renderFooter()}
   `;
 
   initNavbar();

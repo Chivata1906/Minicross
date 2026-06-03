@@ -1,3 +1,4 @@
+import { renderFooter } from '../components/footer';
 import { renderNavbar, initNavbar } from '../components/navbar';
 
 export function initHomePage(): void {
@@ -91,12 +92,7 @@ export function initHomePage(): void {
       </div>
     </section>
 
-    <footer class="border-t border-secondary/20 bg-dark py-8">
-      <div class="mx-auto max-w-7xl px-4 text-center text-sm text-gray-light">
-        <p class="font-title text-xl text-accent tracking-wider mb-2">MINICROSS COLOMBIA 2026</p>
-        <p>Campeonato Nacional de Motocross Juvenil · Triple Corona</p>
-      </div>
-    </footer>
+    ${renderFooter()}
   `;
 
   initNavbar();

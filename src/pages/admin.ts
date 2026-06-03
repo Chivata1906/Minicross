@@ -1,4 +1,5 @@
 import { CONFIG } from '../config';
+import { renderFooter } from '../components/footer';
 import {
   loadEvents,
   loadRegistrations,
@@ -90,7 +91,8 @@ function renderLogin(): string {
           <button type="submit" class="btn-primary w-full">Ingresar</button>
         </form>
       </div>
-    </div>`;
+    </div>
+    ${renderFooter()}`;
 }
 
 
@@ -330,6 +332,7 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
           <div id="registrations-panels">${registrationsByEvent}</div>
         </section>
       </main>
+      ${renderFooter()}
     </div>`;
 }
 

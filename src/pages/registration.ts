@@ -1,4 +1,5 @@
 import { CONFIG } from '../config';
+import { renderFooter } from '../components/footer';
 import { renderNavbar, initNavbar } from '../components/navbar';
 import {
   createRegistration,
@@ -413,11 +414,7 @@ export async function initRegistrationPage(): Promise<void> {
         ${renderLoadingPanel()}
       </div>
     </main>
-    <footer class="border-t border-secondary/20 bg-dark py-8 mt-8">
-      <div class="mx-auto max-w-7xl px-4 text-center text-sm text-gray-light">
-        <p>Minicross Colombia 2026</p>
-      </div>
-    </footer>
+    ${renderFooter()}
   `;
 
   initNavbar();

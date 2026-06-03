@@ -1,3 +1,4 @@
+import { renderFooter } from '../components/footer';
 import { renderNavbar, initNavbar } from '../components/navbar';
 import { loadEvents } from '../utils/storage';
 import { formatDate } from '../utils/age';
@@ -20,6 +21,7 @@ export async function initResultsPage(): Promise<void> {
         <p class="mt-4 text-gray-light">Cargando resultados...</p>
       </div>
     </main>
+    ${renderFooter()}
   `;
 
   initNavbar();

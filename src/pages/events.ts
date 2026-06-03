@@ -1,3 +1,4 @@
+import { renderFooter } from '../components/footer';
 import { renderNavbar, initNavbar } from '../components/navbar';
 import { loadEvents } from '../utils/storage';
 import { formatDate } from '../utils/age';
@@ -77,11 +78,7 @@ export async function initEventsPage(): Promise<void> {
         <div class="col-span-full card border border-secondary/30">${renderLoadingPanel()}</div>
       </div>
     </main>
-    <footer class="border-t border-secondary/20 bg-dark py-8 mt-8">
-      <div class="mx-auto max-w-7xl px-4 text-center text-sm text-gray-light">
-        <p>Minicross Colombia 2026 · Triple Corona</p>
-      </div>
-    </footer>
+    ${renderFooter()}
   `;
 
   initNavbar();
