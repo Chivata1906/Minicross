@@ -14,6 +14,7 @@ const EVENT_HEADERS = ['id', 'name', 'date', 'location', 'city', 'description', 
 const REG_HEADERS = [
   'id', 'eventId', 'nombre', 'apellido', 'identificacion',
   'identificacionArchivo', 'identificacionFileName', 'identificacionFileType',
+  'comprobantePagoArchivo', 'comprobantePagoFileName', 'comprobantePagoFileType',
   'fechaNacimiento', 'edad', 'email', 'celular', 'ciudad', 'marcaMoto',
   'numeroPiloto', 'categoriaId', 'categoriaLabel', 'createdAt', 'updatedAt',
 ];
@@ -24,6 +25,12 @@ function doGet(e) {
   e = e || { parameter: {} };
   const action = (e.parameter.action || 'all').toString();
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  
+  if (action === 'availablePilots') {
+    const eventId = e.parameter.eventId;
+    return jsonResponse({ numbers: getAvailablePilotNumbers_(ss, eventId) });
+  }
 
   if (action === 'checkPilot') {
     const eventId = e.parameter.eventId;
@@ -175,16 +182,71 @@ function saveFileToDrive_(data) {
 
 // ─── Events ──────────────────────────────────────────────────────────────────
 
+
+function parseSheetDate_(value) {
+  if (value == null || value === '') return '';
+  if (typeof value === 'number' && value > 1000) {
+    var utc = new Date((value - 25569) * 86400 * 1000);
+    if (!isNaN(utc.getTime())) return utc.toISOString().slice(0, 10);
+  }
+  var str = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
+  var d = new Date(str.indexOf('T') >= 0 ? str : str + 'T12:00:00');
+  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return str;
+}
+
+function getAvailablePilotNumbers_(ss, eventId) {
+  var regs = getRegistrations_(ss);
+  var taken = {};
+  for (var i = 0; i < regs.length; i++) {
+    if (String(regs[i].eventId) === String(eventId)) {
+      taken[Number(regs[i].numeroPiloto)] = true;
+    }
+  }
+  var numbers = [];
+  for (var n = 4; n <= 999; n++) {
+    if (!taken[n]) numbers.push(n);
+  }
+  return numbers;
+}
+
+function saveComprobanteToDrive_(data) {
+  try {
+    var folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+    var parts = data.comprobantePagoArchivo.split(',');
+    var base64 = parts.length > 1 ? parts[1] : parts[0];
+    var blob = Utilities.newBlob(
+      Utilities.base64Decode(base64),
+      data.comprobantePagoFileType || 'application/octet-stream',
+      data.comprobantePagoFileName || 'comprobante-pago'
+    );
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return file.getUrl();
+  } catch (err) {
+    return '[error al subir comprobante: ' + err.message + ']';
+  }
+}
+
 function getEvents_(ss) {
   var sheet = ss.getSheetByName('Events');
   if (!sheet || sheet.getLastRow() < 2) return [];
-  return sheetToObjects_(sheet);
+  var events = sheetToObjects_(sheet);
+  return events.map(function (evt) {
+    evt.date = parseSheetDate_(evt.date);
+    return evt;
+  });
 }
 
 function getRegistrations_(ss) {
   var sheet = ss.getSheetByName('Registrations');
   if (!sheet || sheet.getLastRow() < 2) return [];
-  return sheetToObjects_(sheet);
+  var events = sheetToObjects_(sheet);
+  return events.map(function (evt) {
+    evt.date = parseSheetDate_(evt.date);
+    return evt;
+  });
 }
 
 function writeEvents_(ss, events) {

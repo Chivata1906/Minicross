@@ -5,17 +5,18 @@ import {
   saveEvents,
   updateRegistration,
   deleteRegistration,
-  exportAllData,
-  importData,
-  downloadJson,
   isApiEnabled,
 } from '../utils/storage';
-import { formatDate, generateId } from '../utils/age';
+import { calculateAge, formatDate, generateId } from '../utils/age';
 import { getCategoriesForAge } from '../types';
 import type { Event, Registration } from '../types';
 
 function isAuthenticated(): boolean {
   return sessionStorage.getItem(CONFIG.storageKeys.adminSession) === 'true';
+}
+
+function isHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value.trim());
 }
 
 function renderLogin(): string {
@@ -35,22 +36,34 @@ function renderLogin(): string {
     </div>`;
 }
 
+function renderCedulaCell(reg: Registration): string {
+  const url = reg.identificacionArchivo?.trim() ?? '';
+  if (!isHttpUrl(url)) {
+    return '<span class="text-gray-light text-xs">—</span>';
+  }
+  return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center text-secondary hover:text-accent" title="Ver documento" aria-label="Ver cedula">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+  </a>`;
+}
+
 function renderRegistrationRow(reg: Registration): string {
+  const firstCategoryId = reg.categoriaId.split(',')[0]?.trim() ?? '';
   return `
     <tr class="border-b border-secondary/10 hover:bg-secondary/5" data-id="${reg.id}">
       <td class="px-3 py-3 text-sm">#${reg.numeroPiloto}</td>
       <td class="px-3 py-3 text-sm">${reg.nombre} ${reg.apellido}</td>
-      <td class="px-3 py-3 text-sm hidden md:table-cell">${reg.edad} anios</td>
+      <td class="px-3 py-3 text-sm hidden md:table-cell">${reg.edad} anos</td>
       <td class="px-3 py-3 text-sm hidden lg:table-cell">${reg.categoriaLabel}</td>
       <td class="px-3 py-3 text-sm hidden lg:table-cell">${reg.ciudad}</td>
       <td class="px-3 py-3 text-sm hidden xl:table-cell">${reg.celular}</td>
+      <td class="px-3 py-3 text-sm text-center">${renderCedulaCell(reg)}</td>
       <td class="px-3 py-3 text-sm">
         <button class="edit-reg text-secondary hover:text-accent mr-2" data-id="${reg.id}">Editar</button>
         <button class="delete-reg text-orange hover:text-accent" data-id="${reg.id}">Eliminar</button>
       </td>
     </tr>
     <tr class="hidden edit-row bg-primary/40" data-edit-id="${reg.id}">
-      <td colspan="7" class="px-4 py-4">
+      <td colspan="8" class="px-4 py-4">
         <form class="edit-form grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-id="${reg.id}">
           <input type="text" name="nombre" value="${reg.nombre}" placeholder="Nombre" class="input-field text-sm" required />
           <input type="text" name="apellido" value="${reg.apellido}" placeholder="Apellido" class="input-field text-sm" required />
@@ -64,7 +77,7 @@ function renderRegistrationRow(reg: Registration): string {
             ${getCategoriesForAge(reg.edad)
               .map(
                 (c) =>
-                  `<option value="${c.id}" ${c.id === reg.categoriaId ? 'selected' : ''}>${c.label}</option>`
+                  `<option value="${c.id}" ${c.id === firstCategoryId ? 'selected' : ''}>${c.label}</option>`
               )
               .join('')}
           </select>
@@ -111,6 +124,7 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
                         <th class="px-3 py-2 hidden lg:table-cell">Categoria</th>
                         <th class="px-3 py-2 hidden lg:table-cell">Ciudad</th>
                         <th class="px-3 py-2 hidden xl:table-cell">Celular</th>
+                        <th class="px-3 py-2 text-center">Cedula</th>
                         <th class="px-3 py-2">Acciones</th>
                       </tr>
                     </thead>
@@ -135,41 +149,22 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
       </header>
 
       <main class="mx-auto max-w-7xl px-4 py-8 space-y-10">
-        <!-- Sync tools -->
         <section class="card">
           <h2 class="font-title text-2xl text-secondary mb-4">Datos del campeonato</h2>
           ${
             isApiEnabled()
               ? `<p class="text-secondary text-sm mb-4 font-semibold">
                   Conectado a Google Sheets en tiempo real. Las inscripciones y cambios se guardan automaticamente.
-                </p>
-                <p class="text-gray-light text-sm mb-4">
-                  Puedes ver y editar los datos tambien directamente en tu Google Sheet.
                 </p>`
               : `<p class="text-gray-light text-sm mb-4">
-                  Modo local activo. Para inscripciones en tiempo real, configura Google Sheets
-                  (ver <code class="text-accent">docs/SETUP-GOOGLE-SHEETS.md</code>) y agrega la URL en
-                  <code class="text-accent">src/config.ts</code>.
-                </p>
-                <p class="text-gray-light text-sm mb-4">
-                  Mientras tanto, usa exportar/importar JSON para respaldar inscripciones.
+                  Modo local activo. Configura Google Sheets (ver docs/SETUP-GOOGLE-SHEETS.md) y la URL en src/config.ts.
                 </p>`
           }
-          <div class="flex flex-wrap gap-3">
-            <button id="export-btn" class="btn-primary">Exportar todo (JSON)</button>
-            <label class="btn-secondary cursor-pointer">
-              Importar JSON
-              <input type="file" id="import-file" accept=".json" class="hidden" />
-            </label>
-            <select id="import-mode" class="input-field w-auto text-sm py-2">
-              <option value="merge">Fusionar con existentes</option>
-              <option value="replace">Reemplazar todo</option>
-            </select>
-          </div>
-          <p id="sync-message" class="mt-3 text-sm hidden"></p>
+          <a href="${CONFIG.spreadsheetUrl}" target="_blank" rel="noopener noreferrer" class="btn-primary inline-block">
+            Abrir Google Sheet
+          </a>
         </section>
 
-        <!-- Events management -->
         <section class="card">
           <div class="flex items-center justify-between mb-4">
             <h2 class="font-title text-2xl text-secondary">Eventos (${activeEvents.length} activos)</h2>
@@ -210,7 +205,6 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
           </form>
         </section>
 
-        <!-- Registrations -->
         <section class="card">
           <h2 class="font-title text-2xl text-secondary mb-4">Inscripciones por evento</h2>
           <div class="flex flex-wrap gap-2 mb-6">${eventTabs}</div>
@@ -234,33 +228,6 @@ function bindAdminEvents(events: Event[]): void {
     initAdminPage();
   });
 
-  document.getElementById('export-btn')?.addEventListener('click', async () => {
-    const data = await exportAllData();
-    downloadJson(data, `minicross-backup-${new Date().toISOString().slice(0, 10)}.json`);
-  });
-
-  document.getElementById('import-file')?.addEventListener('change', async (e) => {
-    const input = e.target as HTMLInputElement;
-    const file = input.files?.[0];
-    const msg = document.getElementById('sync-message');
-    if (!file || !msg) return;
-
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      const mode = (document.getElementById('import-mode') as HTMLSelectElement).value as 'merge' | 'replace';
-      await importData(data, mode);
-      msg.textContent = 'Datos importados correctamente.';
-      msg.className = 'mt-3 text-sm text-secondary';
-      await refreshAdmin();
-    } catch {
-      msg.textContent = 'Error al importar. Verifica el formato del JSON.';
-      msg.className = 'mt-3 text-sm text-orange';
-    }
-    input.value = '';
-  });
-
-  // Event tabs
   const panels = document.querySelectorAll('.event-panel');
   const tabs = document.querySelectorAll('.event-tab');
   if (panels.length > 0) {
@@ -278,7 +245,6 @@ function bindAdminEvents(events: Event[]): void {
   });
   tabs[0]?.classList.add('ring-2', 'ring-secondary');
 
-  // Event toggles
   document.querySelectorAll('.event-active-toggle').forEach((toggle) => {
     toggle.addEventListener('change', async (e) => {
       const id = (e.target as HTMLInputElement).getAttribute('data-id')!;
@@ -289,7 +255,6 @@ function bindAdminEvents(events: Event[]): void {
     });
   });
 
-  // Add/edit event
   const eventForm = document.getElementById('event-form') as HTMLFormElement;
   document.getElementById('add-event-btn')?.addEventListener('click', () => {
     eventForm.classList.remove('hidden');
@@ -345,7 +310,6 @@ function bindAdminEvents(events: Event[]): void {
     await refreshAdmin();
   });
 
-  // Registration edit/delete
   document.querySelectorAll('.edit-reg').forEach((btn) => {
     btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-id')!;
@@ -374,6 +338,8 @@ function bindAdminEvents(events: Event[]): void {
       e.preventDefault();
       const id = form.getAttribute('data-id')!;
       const fd = new FormData(form as HTMLFormElement);
+      const catId = fd.get('categoriaId') as string;
+      const cat = getCategoriesForAge(calculateAge(fd.get('fechaNacimiento') as string)).find((c) => c.id === catId);
       try {
         await updateRegistration(id, {
           nombre: fd.get('nombre') as string,
@@ -384,7 +350,8 @@ function bindAdminEvents(events: Event[]): void {
           ciudad: fd.get('ciudad') as string,
           marcaMoto: fd.get('marcaMoto') as string,
           numeroPiloto: Number(fd.get('numeroPiloto')),
-          categoriaId: fd.get('categoriaId') as string,
+          categoriaId: catId,
+          categoriaLabel: cat?.label ?? catId,
         });
         await refreshAdmin();
       } catch (err) {
@@ -392,7 +359,6 @@ function bindAdminEvents(events: Event[]): void {
       }
     });
   });
-
 }
 
 export async function initAdminPage(): Promise<void> {

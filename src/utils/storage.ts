@@ -1,8 +1,15 @@
 import { CONFIG } from '../config';
 import type { AppData, Event, Registration, RegistrationFormData } from '../types';
-import { calculateAge, generateId } from './age';
+import { calculateAge, generateId, parseSheetDate } from './age';
 import { getCategoryById } from '../types';
-import { apiGet, apiPost, checkPilotNumberRemote, isApiEnabled } from './api';
+import {
+  apiGet,
+  apiPost,
+  checkPilotNumberRemote,
+  getAvailablePilotNumbers as fetchAvailablePilotNumbers,
+  isApiEnabled,
+  allPilotNumbers,
+} from './api';
 
 async function fetchJson<T>(url: string): Promise<T | null> {
   try {
@@ -32,7 +39,7 @@ function normalizeEvent(raw: Record<string, unknown>): Event {
   return {
     id: String(raw.id ?? ''),
     name: String(raw.name ?? ''),
-    date: String(raw.date ?? ''),
+    date: parseSheetDate(raw.date),
     location: String(raw.location ?? ''),
     city: String(raw.city ?? ''),
     description: String(raw.description ?? ''),
@@ -50,6 +57,9 @@ function normalizeRegistration(raw: Record<string, unknown>): Registration {
     identificacionArchivo: String(raw.identificacionArchivo ?? raw.identificacionDriveUrl ?? ''),
     identificacionFileName: String(raw.identificacionFileName ?? ''),
     identificacionFileType: String(raw.identificacionFileType ?? ''),
+    comprobantePagoArchivo: String(raw.comprobantePagoArchivo ?? ''),
+    comprobantePagoFileName: String(raw.comprobantePagoFileName ?? ''),
+    comprobantePagoFileType: String(raw.comprobantePagoFileType ?? ''),
     fechaNacimiento: String(raw.fechaNacimiento ?? ''),
     edad: Number(raw.edad ?? 0),
     email: String(raw.email ?? ''),
@@ -75,10 +85,10 @@ export async function loadEvents(): Promise<Event[]> {
   }
 
   const fromLocal = readLocal<Event[]>(CONFIG.storageKeys.events);
-  if (fromLocal?.length) return fromLocal;
+  if (fromLocal?.length) return fromLocal.map((e) => normalizeEvent(e as unknown as Record<string, unknown>));
 
   const fromFile = await fetchJson<Event[]>('./data/events.json');
-  return fromFile ?? [];
+  return (fromFile ?? []).map((e) => normalizeEvent(e as unknown as Record<string, unknown>));
 }
 
 export async function saveEvents(events: Event[]): Promise<void> {
@@ -105,8 +115,8 @@ export async function loadRegistrations(): Promise<Registration[]> {
   const fromFile = await fetchJson<Registration[]>('./data/registrations.json');
 
   const merged = new Map<string, Registration>();
-  for (const reg of fromFile ?? []) merged.set(reg.id, reg);
-  for (const reg of fromLocal ?? []) merged.set(reg.id, reg);
+  for (const reg of fromFile ?? []) merged.set(reg.id, normalizeRegistration(reg as unknown as Record<string, unknown>));
+  for (const reg of fromLocal ?? []) merged.set(reg.id, normalizeRegistration(reg as unknown as Record<string, unknown>));
 
   return Array.from(merged.values());
 }
@@ -140,7 +150,6 @@ export function isPilotNumberAvailable(
   return !getTakenPilotNumbers(registrations, eventId, excludeId).has(number);
 }
 
-/** Consulta en tiempo real contra Google Sheets si el numero esta libre. */
 export async function isPilotNumberAvailableAsync(
   eventId: string,
   number: number,
@@ -153,8 +162,26 @@ export async function isPilotNumberAvailableAsync(
   return isPilotNumberAvailable(registrations, eventId, number, excludeId);
 }
 
+export async function getAvailablePilotNumbers(eventId: string): Promise<number[]> {
+  if (isApiEnabled()) {
+    const numbers = await fetchAvailablePilotNumbers(eventId);
+    if (numbers.length) return numbers;
+  }
+  const registrations = await loadRegistrations();
+  const taken = getTakenPilotNumbers(registrations, eventId);
+  return allPilotNumbers().filter((n) => !taken.has(n));
+}
+
+function resolveCategoryFields(categoriaIds: string[]): { categoriaId: string; categoriaLabel: string } {
+  const labels = categoriaIds.map((id) => getCategoryById(id)?.label ?? id);
+  return {
+    categoriaId: categoriaIds.join(','),
+    categoriaLabel: labels.join('|'),
+  };
+}
+
 export async function createRegistration(data: RegistrationFormData): Promise<Registration> {
-  const category = getCategoryById(data.categoriaId);
+  const { categoriaId, categoriaLabel } = resolveCategoryFields(data.categoriaIds);
   const edad = calculateAge(data.fechaNacimiento);
   const now = new Date().toISOString();
 
@@ -167,6 +194,9 @@ export async function createRegistration(data: RegistrationFormData): Promise<Re
     identificacionArchivo: data.identificacionArchivo,
     identificacionFileName: data.identificacionFileName,
     identificacionFileType: data.identificacionFileType,
+    comprobantePagoArchivo: data.comprobantePagoArchivo,
+    comprobantePagoFileName: data.comprobantePagoFileName,
+    comprobantePagoFileType: data.comprobantePagoFileType,
     fechaNacimiento: data.fechaNacimiento,
     edad,
     email: data.email.trim(),
@@ -174,8 +204,8 @@ export async function createRegistration(data: RegistrationFormData): Promise<Re
     ciudad: data.ciudad.trim(),
     marcaMoto: data.marcaMoto.trim(),
     numeroPiloto: data.numeroPiloto,
-    categoriaId: data.categoriaId,
-    categoriaLabel: category?.label ?? data.categoriaId,
+    categoriaId,
+    categoriaLabel,
     createdAt: now,
     updatedAt: now,
   };
@@ -230,7 +260,8 @@ export async function updateRegistration(
   }
 
   if (updates.categoriaId) {
-    const cat = getCategoryById(updates.categoriaId);
+    const firstId = updates.categoriaId.split(',')[0]?.trim();
+    const cat = firstId ? getCategoryById(firstId) : undefined;
     merged.categoriaLabel = cat?.label ?? updates.categoriaId;
   }
 

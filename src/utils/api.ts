@@ -1,4 +1,5 @@
 import { CONFIG } from '../config';
+import { PILOT_NUMBER_MAX, PILOT_NUMBER_MIN } from '../types';
 
 export function isApiEnabled(): boolean {
   return Boolean(CONFIG.apiUrl.trim());
@@ -11,7 +12,7 @@ function buildUrl(params: Record<string, string>): string {
 }
 
 export async function apiGet<T>(params: Record<string, string> = {}): Promise<T> {
-  const res = await fetch(buildUrl({ action: 'all', ...params }));
+  const res = await fetch(buildUrl(params));
   if (!res.ok) throw new Error('No se pudo conectar con Google Sheets.');
   return (await res.json()) as T;
 }
@@ -29,6 +30,17 @@ export async function apiPost<T>(body: unknown): Promise<T> {
   return data;
 }
 
+export async function getAvailablePilotNumbers(eventId: string): Promise<number[]> {
+  if (isApiEnabled()) {
+    const data = await apiGet<{ numbers: number[] }>({
+      action: 'availablePilots',
+      eventId,
+    });
+    return data.numbers ?? [];
+  }
+  return [];
+}
+
 export async function checkPilotNumberRemote(
   eventId: string,
   numero: number,
@@ -41,8 +53,12 @@ export async function checkPilotNumberRemote(
   };
   if (excludeId) params.excludeId = excludeId;
 
-  const res = await fetch(buildUrl(params));
-  if (!res.ok) throw new Error('No se pudo verificar el numero de piloto.');
-  const data = (await res.json()) as { available: boolean };
+  const data = await apiGet<{ available: boolean }>(params);
   return data.available;
+}
+
+export function allPilotNumbers(): number[] {
+  const nums: number[] = [];
+  for (let n = PILOT_NUMBER_MIN; n <= PILOT_NUMBER_MAX; n++) nums.push(n);
+  return nums;
 }

@@ -1,3 +1,6 @@
+export const PILOT_NUMBER_MIN = 4;
+export const PILOT_NUMBER_MAX = 999;
+
 export interface Category {
   id: string;
   label: string;
@@ -6,25 +9,23 @@ export interface Category {
 }
 
 export const CATEGORIES: Category[] = [
-  { id: '50cc-4-6', label: '50 cc - 4 a 6 anos', minAge: 4, maxAge: 6 },
-  { id: '50cc-6-8', label: '50 cc - 6 a 8 anos', minAge: 6, maxAge: 8 },
-  { id: '65cc-7-9', label: '65 cc - 7 a 9 anos', minAge: 7, maxAge: 9 },
-  { id: '65cc-8-10', label: '65 cc - 8 a 10 anos', minAge: 8, maxAge: 10 },
-  { id: '85cc-9-11', label: '85 cc - 9 a 11 anos', minAge: 9, maxAge: 11 },
-  { id: '85cc-11-13', label: '85 cc - 11 a 13 anos', minAge: 11, maxAge: 13 },
-  { id: '125cc-junior', label: '125 cc - Junior (12 a 17 anos)', minAge: 12, maxAge: 17 },
+  { id: '50cc-a', label: '50cc A', minAge: 4, maxAge: 6 },
+  { id: '50cc-b', label: '50cc B', minAge: 6, maxAge: 8 },
+  { id: '65cc-a', label: '65cc A', minAge: 7, maxAge: 9 },
+  { id: '65cc-b', label: '65cc B', minAge: 8, maxAge: 10 },
+  { id: '85cc-a', label: '85cc A', minAge: 9, maxAge: 11 },
+  { id: '85cc-b', label: '85cc B', minAge: 11, maxAge: 13 },
+  { id: '125cc-junior', label: '125cc Junior', minAge: 12, maxAge: 17 },
 ];
 
-export function getCategoriesForAge(age: number): Category[] {
-  return CATEGORIES.filter((cat) => age >= cat.minAge && age <= cat.maxAge);
-}
-
 export function getCategoryById(id: string): Category | undefined {
-  return CATEGORIES.find((cat) => cat.id === id);
+  return CATEGORIES.find((c) => c.id === id);
 }
 
-export const PILOT_NUMBER_MIN = 4;
-export const PILOT_NUMBER_MAX = 999;
+export function getCategoriesForAge(age: number): Category[] {
+  if (age < 0) return [];
+  return CATEGORIES.filter((c) => age >= c.minAge && age <= c.maxAge);
+}
 
 export interface Event {
   id: string;
@@ -34,7 +35,6 @@ export interface Event {
   city: string;
   description: string;
   active: boolean;
-  maxPilotNumber?: number;
 }
 
 export interface Registration {
@@ -46,6 +46,9 @@ export interface Registration {
   identificacionArchivo: string;
   identificacionFileName: string;
   identificacionFileType: string;
+  comprobantePagoArchivo: string;
+  comprobantePagoFileName: string;
+  comprobantePagoFileType: string;
   fechaNacimiento: string;
   edad: number;
   email: string;
@@ -59,11 +62,6 @@ export interface Registration {
   updatedAt: string;
 }
 
-export interface AppData {
-  events: Event[];
-  registrations: Registration[];
-}
-
 export interface RegistrationFormData {
   eventId: string;
   nombre: string;
@@ -72,11 +70,19 @@ export interface RegistrationFormData {
   identificacionArchivo: string;
   identificacionFileName: string;
   identificacionFileType: string;
+  comprobantePagoArchivo: string;
+  comprobantePagoFileName: string;
+  comprobantePagoFileType: string;
   fechaNacimiento: string;
   email: string;
   celular: string;
   ciudad: string;
   marcaMoto: string;
   numeroPiloto: number;
-  categoriaId: string;
+  categoriaIds: string[];
+}
+
+export interface AppData {
+  events: Event[];
+  registrations: Registration[];
 }

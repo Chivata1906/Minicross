@@ -3,42 +3,56 @@ import { renderNavbar, initNavbar } from '../components/navbar';
 import {
   createRegistration,
   loadEvents,
-  isPilotNumberAvailableAsync,
+  getAvailablePilotNumbers,
   readFileAsDataUrl,
 } from '../utils/storage';
 import { calculateAge, formatDate } from '../utils/age';
-import {
-  getCategoriesForAge,
-  PILOT_NUMBER_MIN,
-  PILOT_NUMBER_MAX,
-} from '../types';
+import { getCategoriesForAge } from '../types';
 import type { Event } from '../types';
+import Swal from 'sweetalert2';
 
 let idFileData = '';
 let idFileName = '';
 let idFileType = '';
+let paymentFileData = '';
+let paymentFileName = '';
+let paymentFileType = '';
 
 function getEventIdFromUrl(): string | null {
   return new URLSearchParams(window.location.search).get('evento');
 }
 
-function renderCategoryOptions(age: number, selected?: string): string {
+function renderCategoryCheckboxes(age: number, selected: string[] = []): string {
   const categories = getCategoriesForAge(age);
   if (categories.length === 0) {
-    return '<option value="">Sin categorías disponibles para esta edad</option>';
+    return '<p class="text-sm text-gray-light">Sin categorias disponibles para esta edad.</p>';
+  }
+  return `<div class="space-y-2" id="categoria-checkboxes">
+    ${categories
+      .map(
+        (c) => `
+      <label class="flex items-center gap-3 rounded-lg border border-secondary/20 bg-primary/40 px-4 py-3 cursor-pointer hover:border-secondary/50">
+        <input type="checkbox" name="categoriaIds" value="${c.id}" class="accent-secondary h-4 w-4" ${selected.includes(c.id) ? 'checked' : ''} />
+        <span class="text-sm font-medium">${c.label}</span>
+      </label>`
+      )
+      .join('')}
+  </div>`;
+}
+
+function renderPilotOptions(numbers: number[], selected?: number): string {
+  if (numbers.length === 0) {
+    return '<option value="">No hay numeros disponibles</option>';
   }
   return (
-    '<option value="">Selecciona categoría</option>' +
-    categories
-      .map(
-        (c) =>
-          `<option value="${c.id}" ${selected === c.id ? 'selected' : ''}>${c.label}</option>`
-      )
+    '<option value="">Selecciona numero de piloto</option>' +
+    numbers
+      .map((n) => `<option value="${n}" ${selected === n ? 'selected' : ''}>#${n}</option>`)
       .join('')
   );
 }
 
-function renderForm(events: Event[], selectedEventId: string | null): string {
+function renderForm(events: Event[], selectedEventId: string | null, pilotNumbers: number[]): string {
   const eventOptions = events
     .filter((e) => e.active)
     .map(
@@ -66,12 +80,19 @@ function renderForm(events: Event[], selectedEventId: string | null): string {
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-secondary mb-2" for="identificacion">Número de identificación *</label>
+        <label class="block text-sm font-medium text-secondary mb-2" for="identificacion">Numero de identificacion *</label>
         <input type="text" id="identificacion" name="identificacion" required class="input-field mb-3" placeholder="Ej: 1234567890" />
-        <label class="block text-sm font-medium text-gray-light mb-2" for="idFile">Documento (foto o PDF, máx. ${CONFIG.maxFileSizeMB} MB) *</label>
+        <label class="block text-sm font-medium text-gray-light mb-2" for="idFile">Documento de identidad (foto o PDF, max. ${CONFIG.maxFileSizeMB} MB) *</label>
         <input type="file" id="idFile" accept="image/*,.pdf" required
                class="w-full rounded-xl border border-dashed border-secondary/40 bg-primary/40 px-4 py-3 text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-secondary file:px-4 file:py-2 file:font-semibold file:text-primary" />
         <p id="file-preview" class="mt-2 text-sm text-gray-light hidden"></p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-secondary mb-2" for="paymentFile">Comprobante de pago (foto o PDF, max. ${CONFIG.maxFileSizeMB} MB) *</label>
+        <input type="file" id="paymentFile" accept="image/*,.pdf" required
+               class="w-full rounded-xl border border-dashed border-secondary/40 bg-primary/40 px-4 py-3 text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-secondary file:px-4 file:py-2 file:font-semibold file:text-primary" />
+        <p id="payment-preview" class="mt-2 text-sm text-gray-light hidden"></p>
       </div>
 
       <div>
@@ -82,7 +103,7 @@ function renderForm(events: Event[], selectedEventId: string | null): string {
 
       <div class="grid gap-6 sm:grid-cols-2">
         <div>
-          <label class="block text-sm font-medium text-secondary mb-2" for="email">Correo electrónico *</label>
+          <label class="block text-sm font-medium text-secondary mb-2" for="email">Correo electronico *</label>
           <input type="email" id="email" name="email" required class="input-field" autocomplete="email" />
         </div>
         <div>
@@ -104,66 +125,94 @@ function renderForm(events: Event[], selectedEventId: string | null): string {
 
       <div class="grid gap-6 sm:grid-cols-2">
         <div>
-          <label class="block text-sm font-medium text-secondary mb-2" for="numeroPiloto">Número de piloto *</label>
-          <input type="number" id="numeroPiloto" name="numeroPiloto" min="${PILOT_NUMBER_MIN}" max="${PILOT_NUMBER_MAX}" required class="input-field" placeholder="Ej: 42" />
-          <p id="pilot-status" class="mt-1 text-xs text-gray-light">Números del ${PILOT_NUMBER_MIN} al ${PILOT_NUMBER_MAX}. Se valida disponibilidad al enviar.</p>
+          <label class="block text-sm font-medium text-secondary mb-2" for="numeroPiloto">Numero de piloto *</label>
+          <select id="numeroPiloto" name="numeroPiloto" required class="input-field">
+            ${renderPilotOptions(pilotNumbers)}
+          </select>
+          <p id="pilot-status" class="mt-1 text-xs text-gray-light">Selecciona un evento para ver numeros disponibles.</p>
         </div>
         <div>
-          <label class="block text-sm font-medium text-secondary mb-2" for="categoriaId">Categoría *</label>
-          <select id="categoriaId" name="categoriaId" required disabled class="input-field opacity-60">
-            <option value="">Primero ingresa tu fecha de nacimiento</option>
-          </select>
+          <label class="block text-sm font-medium text-secondary mb-2">Categorias * (puedes elegir mas de una si aplica)</label>
+          <div id="categoria-container" class="opacity-60 pointer-events-none">
+            <p class="text-sm text-gray-light">Primero ingresa tu fecha de nacimiento</p>
+          </div>
         </div>
       </div>
 
-      <div id="form-error" class="hidden rounded-xl border border-orange/50 bg-orange/10 px-4 py-3 text-orange"></div>
-      <div id="form-success" class="hidden rounded-xl border border-secondary/50 bg-secondary/10 px-4 py-3 text-secondary"></div>
-
-      <button type="submit" class="btn-primary w-full text-lg py-4">Enviar inscripción</button>
+      <button type="submit" class="btn-primary w-full text-lg py-4">Enviar inscripcion</button>
     </form>`;
 }
 
-async function checkPilotNumber(eventId: string, number: number): Promise<boolean> {
-  return isPilotNumberAvailableAsync(eventId, number);
-}
-
-function showPilotStatus(available: boolean | null, number?: number): void {
+async function refreshPilotSelect(eventId: string): Promise<void> {
+  const select = document.getElementById('numeroPiloto') as HTMLSelectElement | null;
   const status = document.getElementById('pilot-status');
-  if (!status) return;
-  if (available === null) {
-    status.textContent = `Números del ${PILOT_NUMBER_MIN} al ${PILOT_NUMBER_MAX}. Se valida disponibilidad al enviar.`;
-    status.className = 'mt-1 text-xs text-gray-light';
+  if (!select || !status) return;
+
+  if (!eventId) {
+    select.innerHTML = '<option value="">Selecciona un evento</option>';
+    status.textContent = 'Selecciona un evento para ver numeros disponibles.';
     return;
   }
-  if (available) {
-    status.textContent = `El número #${number} está disponible.`;
-    status.className = 'mt-1 text-xs text-secondary font-semibold';
-  } else {
-    status.textContent = `El número #${number} ya está ocupado en este evento.`;
-    status.className = 'mt-1 text-xs text-orange font-semibold';
-  }
+
+  status.textContent = 'Cargando numeros disponibles...';
+  const numbers = await getAvailablePilotNumbers(eventId);
+  const current = Number(select.value);
+  select.innerHTML = renderPilotOptions(numbers, current || undefined);
+  status.textContent = numbers.length
+    ? `${numbers.length} numero(s) disponible(s) para este evento.`
+    : 'No hay numeros disponibles en este evento.';
 }
 
 function updateCategories(age: number): void {
-  const select = document.getElementById('categoriaId') as HTMLSelectElement | null;
+  const container = document.getElementById('categoria-container');
   const ageDisplay = document.getElementById('age-display');
-  if (!select || !ageDisplay) return;
+  if (!container || !ageDisplay) return;
 
   if (age < 0) {
     ageDisplay.classList.add('hidden');
-    select.disabled = true;
-    select.classList.add('opacity-60');
-    select.innerHTML = '<option value="">Fecha inválida</option>';
+    container.classList.add('opacity-60', 'pointer-events-none');
+    container.innerHTML = '<p class="text-sm text-gray-light">Fecha invalida</p>';
     return;
   }
 
-  ageDisplay.textContent = `Edad calculada: ${age} años`;
+  ageDisplay.textContent = `Edad calculada: ${age} anos`;
   ageDisplay.classList.remove('hidden');
 
   const categories = getCategoriesForAge(age);
-  select.innerHTML = renderCategoryOptions(age);
-  select.disabled = categories.length === 0;
-  select.classList.toggle('opacity-60', categories.length === 0);
+  container.classList.toggle('opacity-60', categories.length === 0);
+  container.classList.toggle('pointer-events-none', categories.length === 0);
+  container.innerHTML = renderCategoryCheckboxes(age);
+}
+
+function getSelectedCategoryIds(): string[] {
+  return Array.from(
+    document.querySelectorAll<HTMLInputElement>('input[name="categoriaIds"]:checked')
+  ).map((el) => el.value);
+}
+
+async function handleFileInput(
+  input: HTMLInputElement,
+  previewId: string,
+  onData: (data: string, name: string, type: string) => void,
+  clear: () => void
+): Promise<void> {
+  const file = input.files?.[0];
+  const preview = document.getElementById(previewId);
+  if (!file || !preview) return;
+
+  const maxBytes = CONFIG.maxFileSizeMB * 1024 * 1024;
+  if (file.size > maxBytes) {
+    preview.textContent = `Archivo demasiado grande. Maximo ${CONFIG.maxFileSizeMB} MB.`;
+    preview.classList.remove('hidden');
+    input.value = '';
+    clear();
+    return;
+  }
+
+  const data = await readFileAsDataUrl(file);
+  onData(data, file.name, file.type);
+  preview.textContent = `Archivo seleccionado: ${file.name}`;
+  preview.classList.remove('hidden');
 }
 
 export async function initRegistrationPage(): Promise<void> {
@@ -176,18 +225,20 @@ export async function initRegistrationPage(): Promise<void> {
     ? eventIdFromUrl
     : events[0]?.id ?? null;
 
+  const initialPilots = initialEventId ? await getAvailablePilotNumbers(initialEventId) : [];
+
   app.innerHTML = `
     ${renderNavbar('inscripcion')}
     <main class="mx-auto max-w-3xl px-4 py-12">
       <div class="mb-8 text-center">
-        <h1 class="section-title mb-4">Inscripción de Piloto</h1>
+        <h1 class="section-title mb-4">Inscripcion de Piloto</h1>
         <p class="text-gray-light">Completa el formulario para registrarte en el campeonato Minicross Colombia 2026.</p>
       </div>
       <div class="card">
         ${
           events.length === 0
-            ? '<p class="text-center text-gray-light py-8">No hay eventos abiertos para inscripción.</p>'
-            : renderForm(events, initialEventId)
+            ? '<p class="text-center text-gray-light py-8">No hay eventos abiertos para inscripcion.</p>'
+            : renderForm(events, initialEventId, initialPilots)
         }
       </div>
     </main>
@@ -205,84 +256,94 @@ export async function initRegistrationPage(): Promise<void> {
   const eventSelect = document.getElementById('eventId') as HTMLSelectElement | null;
   const birthInput = document.getElementById('fechaNacimiento') as HTMLInputElement | null;
   const fileInput = document.getElementById('idFile') as HTMLInputElement | null;
+  const paymentInput = document.getElementById('paymentFile') as HTMLInputElement | null;
 
   eventSelect?.addEventListener('change', () => {
-    showPilotStatus(null);
-  });
-
-  const pilotInput = document.getElementById('numeroPiloto') as HTMLInputElement | null;
-  pilotInput?.addEventListener('blur', async () => {
-    const eventId = eventSelect?.value;
-    const num = Number(pilotInput.value);
-    if (!eventId || !num || num < PILOT_NUMBER_MIN || num > PILOT_NUMBER_MAX) {
-      showPilotStatus(null);
-      return;
-    }
-    const available = await checkPilotNumber(eventId, num);
-    showPilotStatus(available, num);
+    if (eventSelect.value) void refreshPilotSelect(eventSelect.value);
   });
 
   birthInput?.addEventListener('change', () => {
     if (birthInput.value) updateCategories(calculateAge(birthInput.value));
   });
 
-  fileInput?.addEventListener('change', async () => {
-    const file = fileInput.files?.[0];
-    const preview = document.getElementById('file-preview');
-    if (!file || !preview) return;
+  fileInput?.addEventListener('change', () => {
+    void handleFileInput(
+      fileInput,
+      'file-preview',
+      (data, name, type) => {
+        idFileData = data;
+        idFileName = name;
+        idFileType = type;
+      },
+      () => {
+        idFileData = '';
+        idFileName = '';
+        idFileType = '';
+      }
+    );
+  });
 
-    const maxBytes = CONFIG.maxFileSizeMB * 1024 * 1024;
-    if (file.size > maxBytes) {
-      preview.textContent = `Archivo demasiado grande. Máximo ${CONFIG.maxFileSizeMB} MB.`;
-      preview.classList.remove('hidden');
-      fileInput.value = '';
-      idFileData = '';
-      return;
-    }
-
-    idFileName = file.name;
-    idFileType = file.type;
-    idFileData = await readFileAsDataUrl(file);
-    preview.textContent = `Archivo seleccionado: ${file.name}`;
-    preview.classList.remove('hidden');
+  paymentInput?.addEventListener('change', () => {
+    void handleFileInput(
+      paymentInput,
+      'payment-preview',
+      (data, name, type) => {
+        paymentFileData = data;
+        paymentFileName = name;
+        paymentFileType = type;
+      },
+      () => {
+        paymentFileData = '';
+        paymentFileName = '';
+        paymentFileType = '';
+      }
+    );
   });
 
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const errorEl = document.getElementById('form-error');
-    const successEl = document.getElementById('form-success');
-    errorEl?.classList.add('hidden');
-    successEl?.classList.add('hidden');
 
     const fd = new FormData(form);
     const fechaNacimiento = fd.get('fechaNacimiento') as string;
     const edad = calculateAge(fechaNacimiento);
-    const categoriaId = fd.get('categoriaId') as string;
+    const categoriaIds = getSelectedCategoryIds();
 
     if (edad < 0) {
-      if (errorEl) {
-        errorEl.textContent = 'Fecha de nacimiento inválida.';
-        errorEl.classList.remove('hidden');
-      }
+      await Swal.fire({ icon: 'error', title: 'Fecha invalida', text: 'Revisa la fecha de nacimiento.' });
       return;
     }
 
     const validCategories = getCategoriesForAge(edad);
-    if (!validCategories.some((c) => c.id === categoriaId)) {
-      if (errorEl) {
-        errorEl.textContent = 'La categoría seleccionada no corresponde a tu edad.';
-        errorEl.classList.remove('hidden');
-      }
+    if (categoriaIds.length === 0 || !categoriaIds.every((id) => validCategories.some((c) => c.id === id))) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Categorias',
+        text: 'Selecciona al menos una categoria valida para tu edad.',
+      });
       return;
     }
 
     if (!idFileData) {
-      if (errorEl) {
-        errorEl.textContent = 'Debes adjuntar el documento de identificación.';
-        errorEl.classList.remove('hidden');
-      }
+      await Swal.fire({ icon: 'error', title: 'Documento', text: 'Debes adjuntar el documento de identidad.' });
       return;
     }
+
+    if (!paymentFileData) {
+      await Swal.fire({ icon: 'error', title: 'Pago', text: 'Debes adjuntar el comprobante de pago.' });
+      return;
+    }
+
+    const numeroPiloto = Number(fd.get('numeroPiloto'));
+    if (!numeroPiloto) {
+      await Swal.fire({ icon: 'error', title: 'Numero de piloto', text: 'Selecciona un numero de piloto.' });
+      return;
+    }
+
+    Swal.fire({
+      title: 'Enviando inscripcion...',
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading(),
+    });
 
     try {
       await createRegistration({
@@ -293,34 +354,46 @@ export async function initRegistrationPage(): Promise<void> {
         identificacionArchivo: idFileData,
         identificacionFileName: idFileName,
         identificacionFileType: idFileType,
+        comprobantePagoArchivo: paymentFileData,
+        comprobantePagoFileName: paymentFileName,
+        comprobantePagoFileType: paymentFileType,
         fechaNacimiento,
         email: fd.get('email') as string,
         celular: fd.get('celular') as string,
         ciudad: fd.get('ciudad') as string,
         marcaMoto: fd.get('marcaMoto') as string,
-        numeroPiloto: Number(fd.get('numeroPiloto')),
-        categoriaId,
+        numeroPiloto,
+        categoriaIds,
       });
 
-      if (successEl) {
-        successEl.textContent = '¡Inscripción enviada con éxito! Te contactaremos pronto.';
-        successEl.classList.remove('hidden');
-      }
+      await Swal.fire({
+        icon: 'success',
+        title: 'Inscripcion enviada',
+        text: 'Te contactaremos pronto con los detalles del evento.',
+      });
+
       form.reset();
       idFileData = '';
       idFileName = '';
       idFileType = '';
+      paymentFileData = '';
+      paymentFileName = '';
+      paymentFileType = '';
       document.getElementById('file-preview')?.classList.add('hidden');
+      document.getElementById('payment-preview')?.classList.add('hidden');
       document.getElementById('age-display')?.classList.add('hidden');
-      const catSelect = document.getElementById('categoriaId') as HTMLSelectElement;
-      catSelect.disabled = true;
-      catSelect.innerHTML = '<option value="">Primero ingresa tu fecha de nacimiento</option>';
-      showPilotStatus(null);
-    } catch (err) {
-      if (errorEl) {
-        errorEl.textContent = err instanceof Error ? err.message : 'Error al enviar la inscripción.';
-        errorEl.classList.remove('hidden');
+      const container = document.getElementById('categoria-container');
+      if (container) {
+        container.classList.add('opacity-60', 'pointer-events-none');
+        container.innerHTML = '<p class="text-sm text-gray-light">Primero ingresa tu fecha de nacimiento</p>';
       }
+      if (eventSelect?.value) await refreshPilotSelect(eventSelect.value);
+    } catch (err) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: err instanceof Error ? err.message : 'No se pudo enviar la inscripcion.',
+      });
     }
   });
 }
