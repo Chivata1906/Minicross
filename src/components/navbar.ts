@@ -26,7 +26,7 @@ export function renderNavbar(activePage: 'home' | 'eventos' | 'inscripcion' | 'r
     <nav class="sticky top-0 z-50 border-b border-secondary/20 bg-primary/95 backdrop-blur-md">
       <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 md:px-6">
         <a href="./index.html" class="flex items-center gap-3">
-          <img src="./logo-minicross.jpg" alt="Minicross Colombia 2026" class="h-12 w-12 rounded-lg object-contain md:h-14 md:w-14" />
+          <img src="./logo-copa-junior-minicross.png" alt="Logo Copa Junior Minicross Colombia 2026" class="h-12 w-12 rounded-lg object-contain md:h-14 md:w-14" />
           <div class="hidden sm:block">
             <p class="font-title text-xl tracking-wider text-accent leading-none">MINICROSS</p>
             <p class="text-xs text-secondary font-medium">Colombia 2026</p>

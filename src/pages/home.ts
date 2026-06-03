@@ -28,7 +28,7 @@ export function initHomePage(): void {
             </div>
           </div>
           <div class="flex justify-center animate-fade-in-up">
-            <img src="./logo-minicross.jpg" alt="Logo Campeonato Minicross Colombia 2026"
+            <img src="./logo-copa-junior-minicross.png" alt="Logo Copa Junior Minicross Colombia 2026"
                  class="max-w-sm rounded-2xl shadow-glow-yellow md:max-w-md" />
           </div>
         </div>
