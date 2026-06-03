@@ -166,6 +166,7 @@ function renderRegistrationRow(reg: Registration, events: Event[]): string {
       <td class="px-3 py-3 text-sm hidden lg:table-cell">${formatCategoryDisplayLabel(reg.categoriaId, reg.categoriaLabel)}</td>
       <td class="px-3 py-3 text-sm hidden md:table-cell font-semibold text-accent">${totalLabel}</td>
       <td class="px-3 py-3 text-sm hidden lg:table-cell">${reg.ciudad}</td>
+      <td class="px-3 py-3 text-sm hidden lg:table-cell">${reg.marcaMoto || '—'}</td>
       <td class="px-3 py-3 text-sm hidden xl:table-cell">${reg.celular}</td>
       <td class="px-3 py-3 text-sm">${reg.identificacion || '—'}</td>
       <td class="px-3 py-3 text-sm text-center">${renderDocumentLinkCell(reg.comprobantePagoArchivo, 'Ver comprobante de pago', 'Ver comprobante de pago')}</td>
@@ -175,7 +176,7 @@ function renderRegistrationRow(reg: Registration, events: Event[]): string {
       </td>
     </tr>
     <tr class="hidden edit-row bg-primary/40" data-edit-id="${reg.id}">
-      <td colspan="10" class="px-4 py-4">
+      <td colspan="11" class="px-4 py-4">
         <form class="edit-form grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-id="${reg.id}">
           <input type="text" name="nombre" value="${reg.nombre}" placeholder="Nombre" class="input-field text-sm" required />
           <input type="text" name="apellido" value="${reg.apellido}" placeholder="Apellido" class="input-field text-sm" required />
@@ -239,6 +240,7 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
                         <th class="px-3 py-2 hidden lg:table-cell">Categoria</th>
                         <th class="px-3 py-2 hidden md:table-cell">Total</th>
                         <th class="px-3 py-2 hidden lg:table-cell">Ciudad</th>
+                        <th class="px-3 py-2 hidden lg:table-cell">Marca moto</th>
                         <th class="px-3 py-2 hidden xl:table-cell">Celular</th>
                         <th class="px-3 py-2">Documento</th>
                         <th class="px-3 py-2 text-center">Pago</th>

@@ -9,6 +9,7 @@ const EXPORT_HEADERS = [
   'Categoria',
   'Total',
   'Ciudad',
+  'Marca moto',
   'Celular',
   'Documento',
 ] as const;
@@ -21,6 +22,7 @@ function registrationToRow(reg: Registration, events: Event[]): string[] {
     formatCategoryDisplayLabel(reg.categoriaId, reg.categoriaLabel),
     formatCop(resolveRegistrationTotal(reg, events)),
     reg.ciudad,
+    reg.marcaMoto,
     reg.celular,
     reg.identificacion,
   ];
