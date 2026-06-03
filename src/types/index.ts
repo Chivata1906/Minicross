@@ -35,6 +35,15 @@ export interface Event {
   city: string;
   description: string;
   active: boolean;
+  finished: boolean;
+  reglamentoUrl: string;
+}
+
+/** Campos temporales al guardar (PDF en base64, no van a la hoja). */
+export interface EventSavePayload extends Event {
+  reglamentoArchivo?: string;
+  reglamentoFileName?: string;
+  reglamentoFileType?: string;
 }
 
 export interface Registration {

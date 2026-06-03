@@ -10,7 +10,7 @@
 const SPREADSHEET_ID = '1g5crmfmbcxyvmLMXxYECxO90gFYiXf7P5JaSze7pmbI';
 const DRIVE_FOLDER_ID = '1oImoS0x__kgBBXaL9HAg3Qf-4Zj0Xz0l';
 
-const EVENT_HEADERS = ['id', 'name', 'date', 'location', 'city', 'description', 'active'];
+const EVENT_HEADERS = ['id', 'name', 'date', 'location', 'city', 'description', 'active', 'reglamentoUrl', 'finished'];
 const REG_HEADERS = [
   'id', 'eventId', 'eventName', 'nombre', 'apellido', 'identificacion',
   'identificacionArchivo', 'identificacionFileName', 'identificacionFileType',
@@ -345,11 +345,14 @@ function saveComprobanteToDrive_(data, ss) {
 }
 
 function getEvents_(ss) {
-  var sheet = ss.getSheetByName('Events');
+  var sheet = getEventsSheet_(ss);
   if (!sheet || sheet.getLastRow() < 2) return [];
   var events = sheetToObjects_(sheet);
   return events.map(function (evt) {
     evt.date = parseSheetDate_(evt.date);
+    evt.active = parseBoolField_(evt.active);
+    evt.finished = parseBoolField_(evt.finished);
+    if (!evt.reglamentoUrl) evt.reglamentoUrl = '';
     return evt;
   });
 }
@@ -361,8 +364,11 @@ function getRegistrations_(ss) {
 }
 
 function writeEvents_(ss, events) {
-  var sheet = getOrCreateSheet_(ss, 'Events', EVENT_HEADERS);
-  writeObjects_(sheet, EVENT_HEADERS, events);
+  var sheet = getEventsSheet_(ss);
+  var rows = events.map(function (evt) {
+    return prepareEventRow_(ss, evt);
+  });
+  writeObjects_(sheet, EVENT_HEADERS, rows);
 }
 
 function writeRegistrations_(ss, registrations) {
@@ -371,6 +377,83 @@ function writeRegistrations_(ss, registrations) {
 }
 
 // ─── Sheet helpers ───────────────────────────────────────────────────────────
+
+
+function parseBoolField_(value) {
+  return value === true || value === 'true' || value === 'TRUE' || value === 1 || value === '1';
+}
+
+function getEventsSheet_(ss) {
+  return getOrCreateSheet_(ss, 'Events', EVENT_HEADERS);
+}
+
+function eventHeadersMatch_(current, headers) {
+  var trimmed = current.map(function (h) { return String(h).trim(); });
+  while (trimmed.length && !trimmed[trimmed.length - 1]) trimmed.pop();
+  if (trimmed.length !== headers.length) return false;
+  for (var i = 0; i < headers.length; i++) {
+    if (trimmed[i] !== headers[i]) return false;
+  }
+  return true;
+}
+
+function syncEventHeaders_(ss, sheet, headers) {
+  var data = sheet.getDataRange().getValues();
+  if (data.length === 0 || (data.length === 1 && !String(data[0][0] || '').trim())) {
+    sheet.clear();
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+    return;
+  }
+  var current = data[0].map(function (h) { return String(h).trim(); });
+  if (eventHeadersMatch_(current, headers)) return;
+  var rows = sheetToObjects_(sheet);
+  rows.forEach(function (row) {
+    row.active = parseBoolField_(row.active);
+    row.finished = parseBoolField_(row.finished);
+    if (!row.reglamentoUrl) row.reglamentoUrl = '';
+  });
+  writeObjects_(sheet, headers, rows);
+}
+
+function saveReglamentoToDrive_(data, ss) {
+  try {
+    var folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+    var parts = data.reglamentoArchivo.split(',');
+    var base64 = parts.length > 1 ? parts[1] : parts[0];
+    var eventName = data.name || getEventNameById_(ss, data.id);
+    var fileName = buildDriveFileName_(data.id || 'evento', eventName, 'REGLAMENTO', data.reglamentoFileName, data.reglamentoFileType || 'application/pdf');
+    var blob = Utilities.newBlob(
+      Utilities.base64Decode(base64),
+      data.reglamentoFileType || 'application/pdf',
+      fileName
+    );
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return file.getUrl();
+  } catch (err) {
+    return '[error al subir reglamento: ' + err.message + ']';
+  }
+}
+
+function prepareEventRow_(ss, data) {
+  var row = {};
+  EVENT_HEADERS.forEach(function (h) {
+    row[h] = data[h] !== undefined && data[h] !== null ? data[h] : '';
+  });
+  row.date = parseSheetDate_(row.date);
+  row.active = parseBoolField_(row.active);
+  row.finished = parseBoolField_(row.finished);
+  if (data.reglamentoArchivo && String(data.reglamentoArchivo).indexOf('data:') === 0) {
+    row.reglamentoUrl = saveReglamentoToDrive_(data, ss);
+  } else if (data.reglamentoUrl && String(data.reglamentoUrl).indexOf('http') === 0) {
+    row.reglamentoUrl = data.reglamentoUrl;
+  } else if (!row.reglamentoUrl) {
+    row.reglamentoUrl = '';
+  }
+  return row;
+}
 
 function getRegistrationsSheet_(ss) {
   return getOrCreateSheet_(ss, 'Registrations', REG_HEADERS);
@@ -411,6 +494,8 @@ function getOrCreateSheet_(ss, name, headers) {
     sheet.setFrozenRows(1);
   } else if (name === 'Registrations') {
     syncRegistrationHeaders_(ss, sheet, headers);
+  } else if (name === 'Events') {
+    syncEventHeaders_(ss, sheet, headers);
   }
   return sheet;
 }
@@ -469,6 +554,19 @@ function jsonResponse(data) {
 
 // ─── Utilidad: crear hojas iniciales (ejecutar una vez manualmente) ──────────
 
+/** Ejecutar manualmente si la hoja Events tiene columnas desalineadas. */
+function repairEventsSheet() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName('Events');
+  if (!sheet) {
+    getEventsSheet_(ss);
+    Logger.log('Hoja Events creada con columnas correctas.');
+    return;
+  }
+  syncEventHeaders_(ss, sheet, EVENT_HEADERS);
+  Logger.log('Hoja Events reparada. Filas: ' + Math.max(0, sheet.getLastRow() - 1));
+}
+
 /** Ejecutar manualmente si la hoja Registrations tiene columnas cruzadas. */
 function repairRegistrationsSheet() {
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -482,9 +580,16 @@ function repairRegistrationsSheet() {
   Logger.log('Hoja Registrations reparada. Filas: ' + Math.max(0, sheet.getLastRow() - 1));
 }
 
+/** Repara Events y Registrations en una sola ejecucion. */
+function repairAllSheets() {
+  repairEventsSheet();
+  repairRegistrationsSheet();
+  Logger.log('Reparacion completada (Events + Registrations).');
+}
+
 function setupSheets() {
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  getOrCreateSheet_(ss, 'Events', EVENT_HEADERS);
+  getEventsSheet_(ss);
   getRegistrationsSheet_(ss);
 
   var eventsSheet = ss.getSheetByName('Events');
@@ -498,6 +603,8 @@ function setupSheets() {
         city: 'Bogota',
         description: 'Primera valida del campeonato. Triple Corona: 3 mangas.',
         active: true,
+        reglamentoUrl: '',
+        finished: false,
       },
       {
         id: 'evt-002',
@@ -507,6 +614,8 @@ function setupSheets() {
         city: 'Medellin',
         description: 'Segunda valida del campeonato.',
         active: true,
+        reglamentoUrl: '',
+        finished: false,
       },
     ]);
   }

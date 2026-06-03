@@ -10,6 +10,7 @@ export default defineConfig({
         eventos: resolve(__dirname, 'eventos.html'),
         inscripcion: resolve(__dirname, 'inscripcion.html'),
         admin: resolve(__dirname, 'panel-minicross-gestion-2026.html'),
+        resultados: resolve(__dirname, 'resultados.html'),
       },
     },
   },

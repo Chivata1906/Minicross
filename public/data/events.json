@@ -5,8 +5,10 @@
     "date": "2026-03-15",
     "location": "Pista Off-Road El Dorado",
     "city": "Bogota",
-    "description": "Primera valida del Campeonato Minicross Colombia 2026. Triple Corona: 3 mangas de pura adrenalina.",
-    "active": true
+    "description": "Primera valida del campeonato. Triple Corona: 3 mangas.",
+    "active": true,
+    "finished": false,
+    "reglamentoUrl": ""
   },
   {
     "id": "evt-002",
@@ -14,7 +16,9 @@
     "date": "2026-05-20",
     "location": "Autodromo del Oriente",
     "city": "Medellin",
-    "description": "Segunda valida del campeonato. Compite por puntos en la clasificacion general.",
-    "active": true
+    "description": "Segunda valida del campeonato.",
+    "active": true,
+    "finished": false,
+    "reglamentoUrl": ""
   }
 ]

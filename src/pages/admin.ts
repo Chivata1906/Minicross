@@ -3,13 +3,14 @@ import {
   loadEvents,
   loadRegistrations,
   saveEvents,
+  readFileAsDataUrl,
   updateRegistration,
   deleteRegistration,
   isApiEnabled,
 } from '../utils/storage';
 import { calculateAge, formatDate, generateId, parseSheetDate } from '../utils/age';
 import { getCategoriesForAge, getCategoryById, validateCategorySelection } from '../types';
-import type { Event, Registration } from '../types';
+import type { Event, EventSavePayload, Registration } from '../types';
 import Swal from 'sweetalert2';
 
 function isAuthenticated(): boolean {
@@ -278,8 +279,13 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
                 </div>
                 <label class="flex items-center gap-2 text-sm">
                   <input type="checkbox" class="event-active-toggle accent-secondary" data-id="${e.id}" ${e.active ? 'checked' : ''} />
-                  Activo
+                  Habilitado inscripciones
                 </label>
+                <label class="flex items-center gap-2 text-sm">
+                  <input type="checkbox" class="event-finished-toggle accent-accent" data-id="${e.id}" ${e.finished ? 'checked' : ''} />
+                  Finalizado
+                </label>
+                ${e.reglamentoUrl?.trim() ? '<a href="' + e.reglamentoUrl + '" target="_blank" rel="noopener noreferrer" class="text-secondary text-sm hover:text-accent">Ver reglamento</a>' : '<span class="text-xs text-gray-light">Sin reglamento</span>'}
                 <button class="edit-event-btn text-secondary text-sm hover:text-accent" data-id="${e.id}">Editar</button>
                 <button class="delete-event-btn text-orange text-sm hover:text-accent" data-id="${e.id}">Eliminar</button>
               </div>`
@@ -295,6 +301,16 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
               <input type="text" id="event-city" placeholder="Ciudad" class="input-field" required />
             </div>
             <textarea id="event-description" placeholder="Descripcion" class="input-field" rows="2" required></textarea>
+            <div>
+              <label class="block text-sm text-secondary mb-2" for="event-reglamento">Reglamento (PDF)</label>
+              <input type="file" id="event-reglamento" accept=".pdf,application/pdf" class="input-field text-sm" />
+              <p id="event-reglamento-preview" class="mt-2 text-xs text-gray-light hidden"></p>
+              <p id="event-reglamento-current" class="mt-2 text-xs text-secondary hidden"></p>
+            </div>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" id="event-finished" class="accent-accent" />
+              Evento finalizado (habilita boton Ver resultados)
+            </label>
             <div class="flex gap-2">
               <button type="submit" class="btn-primary text-sm py-2 px-4">Guardar evento</button>
               <button type="button" id="cancel-event-form" class="btn-outline text-sm py-2 px-4">Cancelar</button>
@@ -376,11 +392,33 @@ function bindAdminEvents(events: Event[]): void {
     });
   });
 
+  document.querySelectorAll('.event-finished-toggle').forEach((toggle) => {
+    toggle.addEventListener('change', async (e) => {
+      const id = (e.target as HTMLInputElement).getAttribute('data-id')!;
+      const updated = events.map((ev) =>
+        ev.id === id ? { ...ev, finished: (e.target as HTMLInputElement).checked } : ev
+      );
+      showSaving('Actualizando evento...');
+      try {
+        await saveEvents(updated);
+        Swal.close();
+        await showSuccess('Evento actualizado', 'El estado de finalizacion se guardo correctamente.');
+        await refreshAdmin();
+      } catch (err) {
+        Swal.close();
+        await showError('Error', err instanceof Error ? err.message : 'No se pudo actualizar el evento.');
+        await refreshAdmin();
+      }
+    });
+  });
+
   const eventForm = document.getElementById('event-form') as HTMLFormElement;
   document.getElementById('add-event-btn')?.addEventListener('click', () => {
     eventForm.classList.remove('hidden');
     (document.getElementById('event-form-id') as HTMLInputElement).value = '';
     eventForm.reset();
+    document.getElementById('event-reglamento-preview')?.classList.add('hidden');
+    document.getElementById('event-reglamento-current')?.classList.add('hidden');
   });
   document.getElementById('cancel-event-form')?.addEventListener('click', () => {
     eventForm.classList.add('hidden');
@@ -398,6 +436,21 @@ function bindAdminEvents(events: Event[]): void {
       (document.getElementById('event-location') as HTMLInputElement).value = event.location;
       (document.getElementById('event-city') as HTMLInputElement).value = event.city;
       (document.getElementById('event-description') as HTMLTextAreaElement).value = event.description;
+      (document.getElementById('event-finished') as HTMLInputElement).checked = event.finished;
+      const reglamentoInput = document.getElementById('event-reglamento') as HTMLInputElement;
+      const reglamentoPreview = document.getElementById('event-reglamento-preview');
+      const reglamentoCurrent = document.getElementById('event-reglamento-current');
+      if (reglamentoInput) reglamentoInput.value = '';
+      reglamentoPreview?.classList.add('hidden');
+      if (event.reglamentoUrl?.trim()) {
+        reglamentoCurrent?.classList.remove('hidden');
+        if (reglamentoCurrent) {
+          reglamentoCurrent.innerHTML = `Reglamento actual: <a href="${event.reglamentoUrl}" target="_blank" rel="noopener noreferrer" class="text-accent hover:underline">Ver PDF</a> (sube otro archivo para reemplazarlo)`;
+        }
+      } else {
+        reglamentoCurrent?.classList.add('hidden');
+        if (reglamentoCurrent) reglamentoCurrent.textContent = '';
+      }
     });
   });
 
@@ -424,20 +477,47 @@ function bindAdminEvents(events: Event[]): void {
     });
   });
 
+
+  const reglamentoInput = document.getElementById('event-reglamento') as HTMLInputElement | null;
+  reglamentoInput?.addEventListener('change', async () => {
+    const preview = document.getElementById('event-reglamento-preview');
+    const file = reglamentoInput.files?.[0];
+    if (!file || !preview) return;
+    const maxBytes = CONFIG.maxFileSizeMB * 1024 * 1024;
+    if (file.size > maxBytes) {
+      preview.textContent = `Archivo demasiado grande. Maximo ${CONFIG.maxFileSizeMB} MB.`;
+      preview.classList.remove('hidden');
+      reglamentoInput.value = '';
+      return;
+    }
+    preview.textContent = `Archivo seleccionado: ${file.name}`;
+    preview.classList.remove('hidden');
+  });
+
   eventForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const formId = (document.getElementById('event-form-id') as HTMLInputElement).value;
     const isEdit = Boolean(formId);
+    const existing = formId ? events.find((ev) => ev.id === formId) : undefined;
 
-    const newEvent: Event = {
+    const newEvent: EventSavePayload = {
       id: formId || generateId(),
       name: (document.getElementById('event-name') as HTMLInputElement).value,
       date: parseSheetDate((document.getElementById('event-date') as HTMLInputElement).value),
       location: (document.getElementById('event-location') as HTMLInputElement).value,
       city: (document.getElementById('event-city') as HTMLInputElement).value,
       description: (document.getElementById('event-description') as HTMLTextAreaElement).value,
-      active: true,
+      active: existing?.active ?? true,
+      finished: (document.getElementById('event-finished') as HTMLInputElement).checked,
+      reglamentoUrl: existing?.reglamentoUrl ?? '',
     };
+
+    const reglamentoFile = (document.getElementById('event-reglamento') as HTMLInputElement).files?.[0];
+    if (reglamentoFile) {
+      newEvent.reglamentoArchivo = await readFileAsDataUrl(reglamentoFile);
+      newEvent.reglamentoFileName = reglamentoFile.name;
+      newEvent.reglamentoFileType = reglamentoFile.type || 'application/pdf';
+    }
 
     const updated = formId
       ? events.map((ev) => (ev.id === formId ? { ...ev, ...newEvent, id: formId } : ev))

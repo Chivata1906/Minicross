@@ -67,6 +67,21 @@ npm run build
 | Admin abre panel oculto | Ve inscripciones directo desde Sheets |
 | Admin edita/elimina | Cambios se reflejan en Sheets al momento |
 
+## Estructura de la hoja Events
+
+| Columna | Descripcion |
+|---------|-------------|
+| id | UUID unico |
+| name | Nombre del evento |
+| date | Fecha (YYYY-MM-DD) |
+| location / city | Ubicacion |
+| description | Descripcion |
+| active | Habilitado para inscripciones (true/false) |
+| reglamentoUrl | URL del PDF del reglamento en Drive |
+| finished | Evento finalizado; habilita boton Ver resultados (true/false) |
+
+Si agregaste columnas manualmente, ejecuta **repairEventsSheet** o **repairAllSheets** en Apps Script (deben aparecer en el selector de funciones tras pegar el script actualizado).
+
 ## Estructura de la hoja Registrations
 
 | Columna | Descripcion |
@@ -90,7 +105,7 @@ Si agregaste columnas manualmente en Sheets o los datos quedaron desalineados tr
 
 1. Copia el contenido actualizado de `docs/google-apps-script.gs` en el editor de Apps Script.
 2. **Implementar** una nueva version del Web App (Implementar > Gestionar implementaciones > Editar > Nueva version).
-3. En Apps Script, ejecuta la funcion **`repairRegistrationsSheet`** (Ejecutar). Autoriza si lo pide.
+3. En Apps Script, ejecuta **`repairAllSheets`** (repara Events y Registrations) o **`repairRegistrationsSheet`** solo para inscripciones. Autoriza si lo pide.
 4. Revisa la hoja `Registrations`: la fila 1 debe coincidir exactamente con el orden de columnas del script.
 
 El script reordena las filas existentes por **nombre de columna**, migra `comprobantePagoArchivo` a `comprobantePagoUrl` y rellena `eventName` automaticamente.

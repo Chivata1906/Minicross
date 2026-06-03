@@ -1,5 +1,5 @@
 import { CONFIG } from '../config';
-import type { AppData, Event, Registration, RegistrationFormData } from '../types';
+import type { AppData, Event, EventSavePayload, Registration, RegistrationFormData } from '../types';
 import { calculateAge, generateId, parseSheetDate } from './age';
 import { getCategoryById, validateCategorySelection } from '../types';
 import {
@@ -34,8 +34,11 @@ function writeLocal<T>(key: string, data: T): void {
   localStorage.setItem(key, JSON.stringify(data));
 }
 
+function parseBoolField(value: unknown): boolean {
+  return value === true || value === 'TRUE' || value === 'true' || value === 1 || value === '1';
+}
+
 function normalizeEvent(raw: Record<string, unknown>): Event {
-  const active = raw.active;
   return {
     id: String(raw.id ?? ''),
     name: String(raw.name ?? ''),
@@ -43,7 +46,9 @@ function normalizeEvent(raw: Record<string, unknown>): Event {
     location: String(raw.location ?? ''),
     city: String(raw.city ?? ''),
     description: String(raw.description ?? ''),
-    active: active === true || active === 'TRUE' || active === 'true' || active === 1,
+    active: parseBoolField(raw.active),
+    finished: parseBoolField(raw.finished),
+    reglamentoUrl: String(raw.reglamentoUrl ?? ''),
   };
 }
 
@@ -92,7 +97,7 @@ export async function loadEvents(): Promise<Event[]> {
   return (fromFile ?? []).map((e) => normalizeEvent(e as unknown as Record<string, unknown>));
 }
 
-export async function saveEvents(events: Event[]): Promise<void> {
+export async function saveEvents(events: EventSavePayload[]): Promise<void> {
   if (isApiEnabled()) {
     await apiPost({ action: 'saveEvents', events });
     return;
