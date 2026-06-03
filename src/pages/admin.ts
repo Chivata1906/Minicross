@@ -10,6 +10,7 @@ import {
   isApiEnabled,
 } from '../utils/storage';
 import { calculateAge, formatDate, generateId, parseSheetDate } from '../utils/age';
+import { exportRegistrationsToExcel } from '../utils/export-registrations';
 import { formatCop, resolveRegistrationTotal } from '../utils/registration-total';
 import {
   formatCategoryDisplayLabel,
@@ -166,7 +167,7 @@ function renderRegistrationRow(reg: Registration, events: Event[]): string {
       <td class="px-3 py-3 text-sm hidden md:table-cell font-semibold text-accent">${totalLabel}</td>
       <td class="px-3 py-3 text-sm hidden lg:table-cell">${reg.ciudad}</td>
       <td class="px-3 py-3 text-sm hidden xl:table-cell">${reg.celular}</td>
-      <td class="px-3 py-3 text-sm text-center">${renderDocumentLinkCell(reg.identificacionArchivo, 'Ver cédula', 'Ver cédula')}</td>
+      <td class="px-3 py-3 text-sm">${reg.identificacion || '—'}</td>
       <td class="px-3 py-3 text-sm text-center">${renderDocumentLinkCell(reg.comprobantePagoArchivo, 'Ver comprobante de pago', 'Ver comprobante de pago')}</td>
       <td class="px-3 py-3 text-sm">
         <button class="edit-reg text-secondary hover:text-accent mr-2" data-id="${reg.id}">Editar</button>
@@ -214,9 +215,16 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
       const regs = registrations.filter((r) => r.eventId === event.id);
       return `
         <div class="event-panel hidden" data-event-panel="${event.id}">
-          <div class="flex items-center justify-between mb-4">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
             <h3 class="font-title text-2xl text-accent">${event.name}</h3>
-            <span class="text-sm text-gray-light">${regs.length} inscrito(s)</span>
+            <div class="flex flex-wrap items-center gap-3">
+              ${
+                regs.length > 0
+                  ? `<button type="button" class="export-registrations-btn btn-outline text-sm py-2 px-4" data-event-id="${event.id}">Exportar Excel</button>`
+                  : ''
+              }
+              <span class="text-sm text-gray-light">${regs.length} inscrito(s)</span>
+            </div>
           </div>
           ${
             regs.length === 0
@@ -232,7 +240,7 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
                         <th class="px-3 py-2 hidden md:table-cell">Total</th>
                         <th class="px-3 py-2 hidden lg:table-cell">Ciudad</th>
                         <th class="px-3 py-2 hidden xl:table-cell">Celular</th>
-                        <th class="px-3 py-2 text-center">Cédula</th>
+                        <th class="px-3 py-2">Documento</th>
                         <th class="px-3 py-2 text-center">Pago</th>
                         <th class="px-3 py-2">Acciones</th>
                       </tr>
@@ -352,7 +360,7 @@ async function refreshAdmin(showLoading = false): Promise<void> {
   try {
     const [events, registrations] = await Promise.all([loadEvents(), loadRegistrations()]);
     app.innerHTML = renderAdminPanel(events, registrations);
-    bindAdminEvents(events);
+    bindAdminEvents(events, registrations);
   } catch (err) {
     Swal.close();
     await showError(
@@ -363,7 +371,7 @@ async function refreshAdmin(showLoading = false): Promise<void> {
   }
 }
 
-function bindAdminEvents(events: Event[]): void {
+function bindAdminEvents(events: Event[], registrations: Registration[]): void {
   document.getElementById('logout-btn')?.addEventListener('click', () => {
     sessionStorage.removeItem(CONFIG.storageKeys.adminSession);
     initAdminPage();
@@ -385,6 +393,17 @@ function bindAdminEvents(events: Event[]): void {
     });
   });
   tabs[0]?.classList.add('ring-2', 'ring-secondary');
+
+  document.querySelectorAll('.export-registrations-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const eventId = btn.getAttribute('data-event-id');
+      if (!eventId) return;
+      const event = events.find((e) => e.id === eventId);
+      const regs = registrations.filter((r) => r.eventId === eventId);
+      if (regs.length === 0) return;
+      exportRegistrationsToExcel(regs, event?.name ?? 'evento', events);
+    });
+  });
 
   document.querySelectorAll('.event-active-toggle').forEach((toggle) => {
     toggle.addEventListener('change', async (e) => {
