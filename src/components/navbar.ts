@@ -1,10 +1,11 @@
 // Panel admin oculto: panel-minicross-gestion-2026.html
 
-export function renderNavbar(activePage: 'home' | 'eventos' | 'inscripcion' = 'home'): string {
+export function renderNavbar(activePage: 'home' | 'eventos' | 'inscripcion' | 'reglamento' = 'home'): string {
   const links = [
     { href: './index.html', label: 'Inicio', key: 'home' },
     { href: './eventos.html', label: 'Eventos', key: 'eventos' },
     { href: './inscripcion.html', label: 'Inscripción', key: 'inscripcion' },
+    { href: './reglamento.html', label: 'Reglamento', key: 'reglamento' },
   ];
 
   const navLinks = links
