@@ -129,6 +129,10 @@ function updateRegistration_(ss, id, updates) {
   });
   merged.id = id;
   merged.updatedAt = new Date().toISOString();
+  if (merged.fechaNacimiento) {
+    merged.fechaNacimiento = parseSheetDate_(merged.fechaNacimiento);
+    merged.edad = calculateAge_(merged.fechaNacimiento);
+  }
   if (updates.eventId !== undefined) {
     merged.eventName = getEventNameById_(ss, merged.eventId);
   } else if (!merged.eventName && merged.eventId) {
@@ -185,12 +189,27 @@ function isPilotNumberAvailable_(ss, eventId, numero, excludeId) {
 // ─── Drive: guardar documento de identidad ───────────────────────────────────
 
 
+function calculateAge_(birthDateStr) {
+  if (!birthDateStr) return '';
+  var birth = new Date(birthDateStr + 'T12:00:00');
+  if (isNaN(birth.getTime())) return '';
+  var ref = new Date();
+  var age = ref.getFullYear() - birth.getFullYear();
+  var m = ref.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && ref.getDate() < birth.getDate())) age--;
+  return age;
+}
+
 function prepareRegistrationRow_(ss, data) {
   var row = {};
   REG_HEADERS.forEach(function (h) {
     row[h] = data[h] !== undefined && data[h] !== null ? data[h] : '';
   });
   row.eventName = getEventNameById_(ss, data.eventId);
+  row.fechaNacimiento = parseSheetDate_(row.fechaNacimiento);
+  if (row.fechaNacimiento) {
+    row.edad = calculateAge_(row.fechaNacimiento);
+  }
   if (!row.comprobantePagoUrl && data.comprobantePagoArchivo && String(data.comprobantePagoArchivo).indexOf('http') === 0) {
     row.comprobantePagoUrl = data.comprobantePagoArchivo;
   }
@@ -279,6 +298,12 @@ function parseSheetDate_(value) {
   }
   var str = String(value).trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
+  var dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) {
+    var day = ('0' + dmy[1]).slice(-2);
+    var month = ('0' + dmy[2]).slice(-2);
+    return dmy[3] + '-' + month + '-' + day;
+  }
   var d = new Date(str.indexOf('T') >= 0 ? str : str + 'T12:00:00');
   if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
   return str;

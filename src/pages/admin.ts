@@ -7,9 +7,10 @@ import {
   deleteRegistration,
   isApiEnabled,
 } from '../utils/storage';
-import { calculateAge, formatDate, generateId } from '../utils/age';
+import { calculateAge, formatDate, generateId, parseSheetDate } from '../utils/age';
 import { getCategoriesForAge } from '../types';
 import type { Event, Registration } from '../types';
+import Swal from 'sweetalert2';
 
 function isAuthenticated(): boolean {
   return sessionStorage.getItem(CONFIG.storageKeys.adminSession) === 'true';
@@ -17,6 +18,56 @@ function isAuthenticated(): boolean {
 
 function isHttpUrl(value: string): boolean {
   return /^https?:\/\//i.test(value.trim());
+}
+
+function renderLoadingPanel(): string {
+  return `
+    <div class="min-h-screen flex items-center justify-center px-4">
+      <div class="card w-full max-w-lg border border-secondary/30">
+        <div class="flex flex-col items-center justify-center gap-5 py-14 text-center" role="status" aria-live="polite">
+          <div class="h-14 w-14 animate-spin rounded-full border-4 border-secondary/25 border-t-secondary"></div>
+          <div>
+            <p class="font-title text-xl tracking-wide text-secondary uppercase">Procesando datos</p>
+            <p class="mt-2 text-sm text-gray-light">Consultando eventos e inscripciones en la base de datos...</p>
+          </div>
+          <div class="flex gap-1.5">
+            <span class="h-2 w-2 animate-pulse rounded-full bg-secondary" style="animation-delay: 0ms"></span>
+            <span class="h-2 w-2 animate-pulse rounded-full bg-accent" style="animation-delay: 150ms"></span>
+            <span class="h-2 w-2 animate-pulse rounded-full bg-secondary" style="animation-delay: 300ms"></span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function showSaving(title = 'Guardando...'): void {
+  Swal.fire({
+    title,
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    didOpen: () => Swal.showLoading(),
+  });
+}
+
+async function showSuccess(title: string, text?: string): Promise<void> {
+  await Swal.fire({ icon: 'success', title, text, confirmButtonText: 'Aceptar' });
+}
+
+async function showError(title: string, text?: string): Promise<void> {
+  await Swal.fire({ icon: 'error', title, text, confirmButtonText: 'Aceptar' });
+}
+
+async function confirmAction(title: string, text: string): Promise<boolean> {
+  const result = await Swal.fire({
+    icon: 'warning',
+    title,
+    text,
+    showCancelButton: true,
+    confirmButtonText: 'Confirmar',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#f97316',
+  });
+  return result.isConfirmed;
 }
 
 function renderLogin(): string {
@@ -48,6 +99,10 @@ function renderDocumentLinkCell(url: string | undefined, title: string, ariaLabe
 
 function renderRegistrationRow(reg: Registration): string {
   const firstCategoryId = reg.categoriaId.split(',')[0]?.trim() ?? '';
+  const birthDate = parseSheetDate(reg.fechaNacimiento);
+  const ageForCategories = birthDate ? calculateAge(birthDate) : reg.edad;
+  const categoryAge = ageForCategories >= 0 ? ageForCategories : reg.edad;
+
   return `
     <tr class="border-b border-secondary/10 hover:bg-secondary/5" data-id="${reg.id}">
       <td class="px-3 py-3 text-sm">#${reg.numeroPiloto}</td>
@@ -68,14 +123,14 @@ function renderRegistrationRow(reg: Registration): string {
         <form class="edit-form grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-id="${reg.id}">
           <input type="text" name="nombre" value="${reg.nombre}" placeholder="Nombre" class="input-field text-sm" required />
           <input type="text" name="apellido" value="${reg.apellido}" placeholder="Apellido" class="input-field text-sm" required />
-          <input type="date" name="fechaNacimiento" value="${reg.fechaNacimiento}" class="input-field text-sm" required />
+          <input type="date" name="fechaNacimiento" value="${birthDate}" class="input-field text-sm" required />
           <input type="email" name="email" value="${reg.email}" placeholder="Email" class="input-field text-sm" required />
           <input type="tel" name="celular" value="${reg.celular}" placeholder="Celular" class="input-field text-sm" required />
           <input type="text" name="ciudad" value="${reg.ciudad}" placeholder="Ciudad" class="input-field text-sm" required />
           <input type="text" name="marcaMoto" value="${reg.marcaMoto}" placeholder="Marca moto" class="input-field text-sm" required />
           <input type="number" name="numeroPiloto" value="${reg.numeroPiloto}" min="4" max="999" class="input-field text-sm" required />
           <select name="categoriaId" class="input-field text-sm" required>
-            ${getCategoriesForAge(reg.edad)
+            ${getCategoriesForAge(categoryAge)
               .map(
                 (c) =>
                   `<option value="${c.id}" ${c.id === firstCategoryId ? 'selected' : ''}>${c.label}</option>`
@@ -216,12 +271,26 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
     </div>`;
 }
 
-async function refreshAdmin(): Promise<void> {
+async function refreshAdmin(showLoading = false): Promise<void> {
   const app = document.getElementById('app');
   if (!app) return;
-  const [events, registrations] = await Promise.all([loadEvents(), loadRegistrations()]);
-  app.innerHTML = renderAdminPanel(events, registrations);
-  bindAdminEvents(events);
+
+  if (showLoading) {
+    app.innerHTML = renderLoadingPanel();
+  }
+
+  try {
+    const [events, registrations] = await Promise.all([loadEvents(), loadRegistrations()]);
+    app.innerHTML = renderAdminPanel(events, registrations);
+    bindAdminEvents(events);
+  } catch (err) {
+    Swal.close();
+    await showError(
+      'Error al cargar',
+      err instanceof Error ? err.message : 'No se pudieron obtener los datos del panel.'
+    );
+    app.innerHTML = renderLoadingPanel();
+  }
 }
 
 function bindAdminEvents(events: Event[]): void {
@@ -253,7 +322,17 @@ function bindAdminEvents(events: Event[]): void {
       const updated = events.map((ev) =>
         ev.id === id ? { ...ev, active: (e.target as HTMLInputElement).checked } : ev
       );
-      await saveEvents(updated);
+      showSaving('Actualizando evento...');
+      try {
+        await saveEvents(updated);
+        Swal.close();
+        await showSuccess('Evento actualizado', 'El estado del evento se guardo correctamente.');
+        await refreshAdmin();
+      } catch (err) {
+        Swal.close();
+        await showError('Error', err instanceof Error ? err.message : 'No se pudo actualizar el evento.');
+        await refreshAdmin();
+      }
     });
   });
 
@@ -275,7 +354,7 @@ function bindAdminEvents(events: Event[]): void {
       eventForm.classList.remove('hidden');
       (document.getElementById('event-form-id') as HTMLInputElement).value = event.id;
       (document.getElementById('event-name') as HTMLInputElement).value = event.name;
-      (document.getElementById('event-date') as HTMLInputElement).value = event.date;
+      (document.getElementById('event-date') as HTMLInputElement).value = parseSheetDate(event.date);
       (document.getElementById('event-location') as HTMLInputElement).value = event.location;
       (document.getElementById('event-city') as HTMLInputElement).value = event.city;
       (document.getElementById('event-description') as HTMLTextAreaElement).value = event.description;
@@ -285,19 +364,35 @@ function bindAdminEvents(events: Event[]): void {
   document.querySelectorAll('.delete-event-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-id')!;
-      if (!confirm('Eliminar este evento? Las inscripciones asociadas permaneceran.')) return;
-      await saveEvents(events.filter((e) => e.id !== id));
-      await refreshAdmin();
+      const event = events.find((e) => e.id === id);
+      const confirmed = await confirmAction(
+        'Eliminar evento',
+        `Se eliminara "${event?.name ?? 'este evento'}". Las inscripciones asociadas permaneceran.`
+      );
+      if (!confirmed) return;
+
+      showSaving('Eliminando evento...');
+      try {
+        await saveEvents(events.filter((e) => e.id !== id));
+        Swal.close();
+        await showSuccess('Evento eliminado', 'El evento se elimino correctamente.');
+        await refreshAdmin();
+      } catch (err) {
+        Swal.close();
+        await showError('Error', err instanceof Error ? err.message : 'No se pudo eliminar el evento.');
+      }
     });
   });
 
   eventForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const formId = (document.getElementById('event-form-id') as HTMLInputElement).value;
+    const isEdit = Boolean(formId);
+
     const newEvent: Event = {
       id: formId || generateId(),
       name: (document.getElementById('event-name') as HTMLInputElement).value,
-      date: (document.getElementById('event-date') as HTMLInputElement).value,
+      date: parseSheetDate((document.getElementById('event-date') as HTMLInputElement).value),
       location: (document.getElementById('event-location') as HTMLInputElement).value,
       city: (document.getElementById('event-city') as HTMLInputElement).value,
       description: (document.getElementById('event-description') as HTMLTextAreaElement).value,
@@ -308,8 +403,19 @@ function bindAdminEvents(events: Event[]): void {
       ? events.map((ev) => (ev.id === formId ? { ...ev, ...newEvent, id: formId } : ev))
       : [...events, newEvent];
 
-    await saveEvents(updated);
-    await refreshAdmin();
+    showSaving(isEdit ? 'Guardando cambios...' : 'Creando evento...');
+    try {
+      await saveEvents(updated);
+      Swal.close();
+      await showSuccess(
+        isEdit ? 'Evento actualizado' : 'Evento creado',
+        isEdit ? 'Los cambios se guardaron correctamente.' : 'El nuevo evento se creo correctamente.'
+      );
+      await refreshAdmin();
+    } catch (err) {
+      Swal.close();
+      await showError('Error', err instanceof Error ? err.message : 'No se pudo guardar el evento.');
+    }
   });
 
   document.querySelectorAll('.edit-reg').forEach((btn) => {
@@ -329,9 +435,22 @@ function bindAdminEvents(events: Event[]): void {
   document.querySelectorAll('.delete-reg').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-id')!;
-      if (!confirm('Eliminar esta inscripción?')) return;
-      await deleteRegistration(id);
-      await refreshAdmin();
+      const confirmed = await confirmAction(
+        'Eliminar inscripcion',
+        'Esta accion no se puede deshacer. Se eliminara la inscripcion seleccionada.'
+      );
+      if (!confirmed) return;
+
+      showSaving('Eliminando inscripcion...');
+      try {
+        await deleteRegistration(id);
+        Swal.close();
+        await showSuccess('Inscripcion eliminada', 'La inscripcion se elimino correctamente.');
+        await refreshAdmin();
+      } catch (err) {
+        Swal.close();
+        await showError('Error', err instanceof Error ? err.message : 'No se pudo eliminar la inscripcion.');
+      }
     });
   });
 
@@ -340,13 +459,21 @@ function bindAdminEvents(events: Event[]): void {
       e.preventDefault();
       const id = form.getAttribute('data-id')!;
       const fd = new FormData(form as HTMLFormElement);
+      const fechaNacimiento = parseSheetDate(fd.get('fechaNacimiento') as string);
       const catId = fd.get('categoriaId') as string;
-      const cat = getCategoriesForAge(calculateAge(fd.get('fechaNacimiento') as string)).find((c) => c.id === catId);
+      const cat = getCategoriesForAge(calculateAge(fechaNacimiento)).find((c) => c.id === catId);
+
+      if (!fechaNacimiento) {
+        await showError('Fecha invalida', 'Revisa la fecha de nacimiento.');
+        return;
+      }
+
+      showSaving('Guardando inscripcion...');
       try {
         await updateRegistration(id, {
           nombre: fd.get('nombre') as string,
           apellido: fd.get('apellido') as string,
-          fechaNacimiento: fd.get('fechaNacimiento') as string,
+          fechaNacimiento,
           email: fd.get('email') as string,
           celular: fd.get('celular') as string,
           ciudad: fd.get('ciudad') as string,
@@ -355,9 +482,12 @@ function bindAdminEvents(events: Event[]): void {
           categoriaId: catId,
           categoriaLabel: cat?.label ?? catId,
         });
+        Swal.close();
+        await showSuccess('Inscripcion actualizada', 'Los cambios se guardaron correctamente.');
         await refreshAdmin();
       } catch (err) {
-        alert(err instanceof Error ? err.message : 'Error al guardar.');
+        Swal.close();
+        await showError('Error', err instanceof Error ? err.message : 'No se pudo guardar la inscripcion.');
       }
     });
   });
@@ -384,5 +514,5 @@ export async function initAdminPage(): Promise<void> {
     return;
   }
 
-  await refreshAdmin();
+  await refreshAdmin(true);
 }

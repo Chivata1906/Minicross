@@ -61,7 +61,7 @@ function normalizeRegistration(raw: Record<string, unknown>): Registration {
     comprobantePagoArchivo: String(raw.comprobantePagoArchivo ?? raw.comprobantePagoUrl ?? ''),
     comprobantePagoFileName: String(raw.comprobantePagoFileName ?? ''),
     comprobantePagoFileType: String(raw.comprobantePagoFileType ?? ''),
-    fechaNacimiento: String(raw.fechaNacimiento ?? ''),
+    fechaNacimiento: parseSheetDate(raw.fechaNacimiento),
     edad: Number(raw.edad ?? 0),
     email: String(raw.email ?? ''),
     celular: String(raw.celular ?? ''),
@@ -260,7 +260,8 @@ export async function updateRegistration(
   }
 
   if (updates.fechaNacimiento) {
-    merged.edad = calculateAge(updates.fechaNacimiento);
+    merged.fechaNacimiento = parseSheetDate(updates.fechaNacimiento);
+    merged.edad = calculateAge(merged.fechaNacimiento);
   }
 
   if (updates.categoriaId) {

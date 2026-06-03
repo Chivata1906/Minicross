@@ -17,6 +17,13 @@ export function parseSheetDate(value: unknown): string {
   }
   const str = String(value).trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
+  const dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) {
+    const day = dmy[1].padStart(2, '0');
+    const month = dmy[2].padStart(2, '0');
+    const year = dmy[3];
+    return `${year}-${month}-${day}`;
+  }
   const d = new Date(str.includes('T') ? str : str + 'T12:00:00');
   if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
   return str;
