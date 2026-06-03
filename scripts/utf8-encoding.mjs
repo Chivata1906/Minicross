@@ -30,6 +30,7 @@ const ROOT_FILE_NAMES = new Set([
   'vite.config.ts',
   'tailwind.config.js',
   'postcss.config.js',
+  'README.md',
   '.gitignore',
   '.editorconfig',
   '.gitattributes',
