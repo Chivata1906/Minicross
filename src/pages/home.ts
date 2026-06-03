@@ -19,8 +19,10 @@ export function initHomePage(): void {
               COLOMBIA 2026
             </h1>
             <p class="mt-6 text-lg text-gray-light leading-relaxed">
-              Velocidad, energía y competencia off-road. El campeonato que reúne a los mejores
-              pilotos juveniles de motocross en categorías desde 50 cc hasta 125 cc Junior.
+              Campeonato privado de formación del motocross en Colombia, pensado para pilotos
+              infantiles y juveniles. Siete categorías oficiales de 50 cc a 125 cc Junior,
+              formato Triple Corona con tres mangas por válida y un entorno seguro para que
+              compitan, aprendan y crezcan en pista.
             </p>
             <div class="mt-8 flex flex-wrap gap-4">
               <a href="./inscripcion.html" class="btn-primary">Inscríbete ahora</a>
