@@ -84,6 +84,17 @@ npm run build
 | numeroPiloto | Numero del 4 al 999 |
 | categoriaId / categoriaLabel | Categoria asignada |
 
+### Reparar columnas cruzadas
+
+Si agregaste columnas manualmente en Sheets o los datos quedaron desalineados tras actualizar el script:
+
+1. Copia el contenido actualizado de `docs/google-apps-script.gs` en el editor de Apps Script.
+2. **Implementar** una nueva version del Web App (Implementar > Gestionar implementaciones > Editar > Nueva version).
+3. En Apps Script, ejecuta la funcion **`repairRegistrationsSheet`** (Ejecutar). Autoriza si lo pide.
+4. Revisa la hoja `Registrations`: la fila 1 debe coincidir exactamente con el orden de columnas del script.
+
+El script reordena las filas existentes por **nombre de columna**, migra `comprobantePagoArchivo` a `comprobantePagoUrl` y rellena `eventName` automaticamente.
+
 ## Probar la conexion
 
 Abre en el navegador (reemplaza con tu URL):

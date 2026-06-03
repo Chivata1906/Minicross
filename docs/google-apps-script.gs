@@ -110,13 +110,13 @@ function createRegistration_(ss, data) {
   }
 
   var row = prepareRegistrationRow_(ss, data);
-  const sheet = getOrCreateSheet_(ss, 'Registrations', REG_HEADERS);
+  const sheet = getRegistrationsSheet_(ss);
   appendRow_(sheet, REG_HEADERS, row);
   return { success: true, registration: row };
 }
 
 function updateRegistration_(ss, id, updates) {
-  const sheet = ss.getSheetByName('Registrations');
+  const sheet = getRegistrationsSheet_(ss);
   if (!sheet) return { success: false, error: 'Hoja Registrations no encontrada' };
 
   const rows = sheetToObjects_(sheet);
@@ -154,7 +154,7 @@ function updateRegistration_(ss, id, updates) {
 }
 
 function deleteRegistration_(ss, id) {
-  const sheet = ss.getSheetByName('Registrations');
+  const sheet = getRegistrationsSheet_(ss);
   if (!sheet) return { success: false, error: 'Hoja no encontrada' };
 
   const rows = sheetToObjects_(sheet);
@@ -330,13 +330,9 @@ function getEvents_(ss) {
 }
 
 function getRegistrations_(ss) {
-  var sheet = ss.getSheetByName('Registrations');
+  var sheet = getRegistrationsSheet_(ss);
   if (!sheet || sheet.getLastRow() < 2) return [];
-  var events = sheetToObjects_(sheet);
-  return events.map(function (evt) {
-    evt.date = parseSheetDate_(evt.date);
-    return evt;
-  });
+  return sheetToObjects_(sheet);
 }
 
 function writeEvents_(ss, events) {
@@ -345,11 +341,41 @@ function writeEvents_(ss, events) {
 }
 
 function writeRegistrations_(ss, registrations) {
-  var sheet = getOrCreateSheet_(ss, 'Registrations', REG_HEADERS);
+  var sheet = getRegistrationsSheet_(ss);
   writeObjects_(sheet, REG_HEADERS, registrations);
 }
 
 // ─── Sheet helpers ───────────────────────────────────────────────────────────
+
+function getRegistrationsSheet_(ss) {
+  return getOrCreateSheet_(ss, 'Registrations', REG_HEADERS);
+}
+
+function registrationHeadersMatch_(current, headers) {
+  var trimmed = current.map(function (h) { return String(h).trim(); });
+  while (trimmed.length && !trimmed[trimmed.length - 1]) trimmed.pop();
+  if (trimmed.length !== headers.length) return false;
+  for (var i = 0; i < headers.length; i++) {
+    if (trimmed[i] !== headers[i]) return false;
+  }
+  return true;
+}
+
+function migrateRegistrationRows_(ss, rows) {
+  rows.forEach(function (row) {
+    if (!row.eventName && row.eventId) {
+      row.eventName = getEventNameById_(ss, row.eventId);
+    }
+    if (!row.comprobantePagoUrl && row.comprobantePagoArchivo) {
+      var legacy = String(row.comprobantePagoArchivo);
+      if (legacy.indexOf('http') === 0) {
+        row.comprobantePagoUrl = legacy;
+      }
+    }
+    delete row.comprobantePagoArchivo;
+  });
+  return rows;
+}
 
 function getOrCreateSheet_(ss, name, headers) {
   var sheet = ss.getSheetByName(name);
@@ -366,26 +392,18 @@ function getOrCreateSheet_(ss, name, headers) {
 
 function syncRegistrationHeaders_(ss, sheet, headers) {
   var data = sheet.getDataRange().getValues();
-  if (data.length === 0) {
+  if (data.length === 0 || (data.length === 1 && !String(data[0][0] || '').trim())) {
+    sheet.clear();
     sheet.appendRow(headers);
     sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
     sheet.setFrozenRows(1);
     return;
   }
 
-  var current = data[0].map(function (h) { return String(h); });
-  var needsSync = headers.some(function (h) { return current.indexOf(h) === -1; });
-  if (!needsSync) return;
+  var current = data[0].map(function (h) { return String(h).trim(); });
+  if (registrationHeadersMatch_(current, headers)) return;
 
-  var rows = sheetToObjects_(sheet);
-  rows.forEach(function (row) {
-    if (!row.eventName && row.eventId) {
-      row.eventName = getEventNameById_(ss, row.eventId);
-    }
-    if (!row.comprobantePagoUrl && row.comprobantePagoArchivo && String(row.comprobantePagoArchivo).indexOf('http') === 0) {
-      row.comprobantePagoUrl = row.comprobantePagoArchivo;
-    }
-  });
+  var rows = migrateRegistrationRows_(ss, sheetToObjects_(sheet));
   writeObjects_(sheet, headers, rows);
 }
 
@@ -426,10 +444,23 @@ function jsonResponse(data) {
 
 // ─── Utilidad: crear hojas iniciales (ejecutar una vez manualmente) ──────────
 
+/** Ejecutar manualmente si la hoja Registrations tiene columnas cruzadas. */
+function repairRegistrationsSheet() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName('Registrations');
+  if (!sheet) {
+    getRegistrationsSheet_(ss);
+    Logger.log('Hoja Registrations creada con columnas correctas.');
+    return;
+  }
+  syncRegistrationHeaders_(ss, sheet, REG_HEADERS);
+  Logger.log('Hoja Registrations reparada. Filas: ' + Math.max(0, sheet.getLastRow() - 1));
+}
+
 function setupSheets() {
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   getOrCreateSheet_(ss, 'Events', EVENT_HEADERS);
-  getOrCreateSheet_(ss, 'Registrations', REG_HEADERS);
+  getRegistrationsSheet_(ss);
 
   var eventsSheet = ss.getSheetByName('Events');
   if (eventsSheet.getLastRow() === 1) {
