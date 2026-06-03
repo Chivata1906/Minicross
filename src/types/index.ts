@@ -102,6 +102,7 @@ export interface Registration {
   numeroPiloto: number;
   categoriaId: string;
   categoriaLabel: string;
+  valorTotalInscripcion: number;
   createdAt: string;
   updatedAt: string;
 }

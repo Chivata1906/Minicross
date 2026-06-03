@@ -9,6 +9,7 @@ import {
 } from '../utils/storage';
 import { calculateAge, formatDate } from '../utils/age';
 import { getCategoriesForAge, formatCategoryOptionLabel, type Event } from '../types';
+import { formatCop } from '../utils/registration-total';
 import Swal from 'sweetalert2';
 
 let idFileData = '';
@@ -66,14 +67,6 @@ function renderLoadingPanel(): string {
         <span class="h-2 w-2 animate-pulse rounded-full bg-secondary" style="animation-delay: 300ms"></span>
       </div>
     </div>`;
-}
-
-function formatCop(amount: number): string {
-  return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    maximumFractionDigits: 0,
-  }).format(amount);
 }
 
 function renderForm(events: Event[], selectedEventId: string | null, pilotNumbers: number[]): string {

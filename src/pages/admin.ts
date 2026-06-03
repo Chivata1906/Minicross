@@ -10,6 +10,7 @@ import {
   isApiEnabled,
 } from '../utils/storage';
 import { calculateAge, formatDate, generateId, parseSheetDate } from '../utils/age';
+import { formatCop, resolveRegistrationTotal } from '../utils/registration-total';
 import {
   formatCategoryDisplayLabel,
   formatCategoryOptionLabel,
@@ -149,11 +150,12 @@ function renderDocumentLinkCell(url: string | undefined, title: string, ariaLabe
   </a>`;
 }
 
-function renderRegistrationRow(reg: Registration): string {
+function renderRegistrationRow(reg: Registration, events: Event[]): string {
   const selectedCategoryIds = parseCategoryIds(reg.categoriaId);
   const birthDate = parseSheetDate(reg.fechaNacimiento);
   const ageForCategories = birthDate ? calculateAge(birthDate) : reg.edad;
   const categoryAge = ageForCategories >= 0 ? ageForCategories : reg.edad;
+  const totalLabel = formatCop(resolveRegistrationTotal(reg, events));
 
   return `
     <tr class="border-b border-secondary/10 hover:bg-secondary/5" data-id="${reg.id}">
@@ -161,6 +163,7 @@ function renderRegistrationRow(reg: Registration): string {
       <td class="px-3 py-3 text-sm">${reg.nombre} ${reg.apellido}</td>
       <td class="px-3 py-3 text-sm hidden md:table-cell">${reg.edad} años</td>
       <td class="px-3 py-3 text-sm hidden lg:table-cell">${formatCategoryDisplayLabel(reg.categoriaId, reg.categoriaLabel)}</td>
+      <td class="px-3 py-3 text-sm hidden md:table-cell font-semibold text-accent">${totalLabel}</td>
       <td class="px-3 py-3 text-sm hidden lg:table-cell">${reg.ciudad}</td>
       <td class="px-3 py-3 text-sm hidden xl:table-cell">${reg.celular}</td>
       <td class="px-3 py-3 text-sm text-center">${renderDocumentLinkCell(reg.identificacionArchivo, 'Ver cédula', 'Ver cédula')}</td>
@@ -171,7 +174,7 @@ function renderRegistrationRow(reg: Registration): string {
       </td>
     </tr>
     <tr class="hidden edit-row bg-primary/40" data-edit-id="${reg.id}">
-      <td colspan="9" class="px-4 py-4">
+      <td colspan="10" class="px-4 py-4">
         <form class="edit-form grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-id="${reg.id}">
           <input type="text" name="nombre" value="${reg.nombre}" placeholder="Nombre" class="input-field text-sm" required />
           <input type="text" name="apellido" value="${reg.apellido}" placeholder="Apellido" class="input-field text-sm" required />
@@ -226,6 +229,7 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
                         <th class="px-3 py-2">Nombre</th>
                         <th class="px-3 py-2 hidden md:table-cell">Edad</th>
                         <th class="px-3 py-2 hidden lg:table-cell">Categoria</th>
+                        <th class="px-3 py-2 hidden md:table-cell">Total</th>
                         <th class="px-3 py-2 hidden lg:table-cell">Ciudad</th>
                         <th class="px-3 py-2 hidden xl:table-cell">Celular</th>
                         <th class="px-3 py-2 text-center">Cédula</th>
@@ -233,7 +237,7 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
                         <th class="px-3 py-2">Acciones</th>
                       </tr>
                     </thead>
-                    <tbody>${regs.map((r) => renderRegistrationRow(r)).join('')}</tbody>
+                    <tbody>${regs.map((r) => renderRegistrationRow(r, events)).join('')}</tbody>
                   </table>
                 </div>`
           }

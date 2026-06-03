@@ -83,6 +83,8 @@ npm run build
 
 Si agregaste columnas manualmente, ejecuta **repairEventsSheet** o **repairAllSheets** en Apps Script (deben aparecer en el selector de funciones tras pegar el script actualizado).
 
+> **Importante:** Las funciones `repair*` crean una **copia de seguridad** de la hoja (`BACKUP_Registrations_...`) antes de remapear columnas. El uso normal del sitio **solo agrega columnas nuevas** al final y **no borra inscripciones**. Ejecuta `repair*` solo si las columnas estan cruzadas/desordenadas.
+
 ## Estructura de la hoja Registrations
 
 | Columna | Descripcion |
@@ -99,6 +101,7 @@ Si agregaste columnas manualmente, ejecuta **repairEventsSheet** o **repairAllSh
 | marcaMoto | Marca de la moto |
 | numeroPiloto | Numero del 4 al 999 |
 | categoriaId / categoriaLabel | Categoria asignada |
+| valorTotalInscripcion | Total pagado (valorInscripcion × cantidad de categorias) |
 
 ### Reparar columnas cruzadas
 

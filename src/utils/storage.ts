@@ -2,6 +2,7 @@ import { CONFIG } from '../config';
 import type { AppData, Event, EventSavePayload, Registration, RegistrationFormData } from '../types';
 import { calculateAge, generateId, parseSheetDate } from './age';
 import { getCategoryById, formatCategoryOptionLabel, validateCategorySelection } from '../types';
+import { computeRegistrationTotal } from './registration-total';
 import {
   apiGet,
   apiPost,
@@ -76,6 +77,7 @@ function normalizeRegistration(raw: Record<string, unknown>): Registration {
     numeroPiloto: Number(raw.numeroPiloto ?? 0),
     categoriaId: String(raw.categoriaId ?? ''),
     categoriaLabel: String(raw.categoriaLabel ?? ''),
+    valorTotalInscripcion: Number(raw.valorTotalInscripcion ?? 0) || 0,
     createdAt: String(raw.createdAt ?? ''),
     updatedAt: String(raw.updatedAt ?? ''),
   };
@@ -197,6 +199,9 @@ export async function createRegistration(data: RegistrationFormData): Promise<Re
   const { categoriaId, categoriaLabel } = resolveCategoryFields(data.categoriaIds);
   const edad = calculateAge(data.fechaNacimiento);
   const now = new Date().toISOString();
+  const events = await loadEvents();
+  const event = events.find((e) => e.id === data.eventId);
+  const valorTotalInscripcion = computeRegistrationTotal(event, data.categoriaIds);
 
   const registration: Registration = {
     id: generateId(),
@@ -219,6 +224,7 @@ export async function createRegistration(data: RegistrationFormData): Promise<Re
     numeroPiloto: data.numeroPiloto,
     categoriaId,
     categoriaLabel,
+    valorTotalInscripcion,
     createdAt: now,
     updatedAt: now,
   };
@@ -285,6 +291,13 @@ export async function updateRegistration(
       })
       .join('|');
   }
+
+  const events = await loadEvents();
+  const event = events.find((e) => e.id === merged.eventId);
+  merged.valorTotalInscripcion = computeRegistrationTotal(
+    event,
+    merged.categoriaId.split(',').map((id) => id.trim()).filter(Boolean)
+  );
 
   registrations[index] = merged;
   await saveRegistrations(registrations);
