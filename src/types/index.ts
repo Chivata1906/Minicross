@@ -18,6 +18,21 @@ export const CATEGORIES: Category[] = [
   { id: '125cc-junior', label: '125cc Junior', minAge: 12, maxAge: 17 },
 ];
 
+
+export function formatCategoryDisplayLabel(categoriaId: string, fallbackLabel = ''): string {
+  const ids = categoriaId.split(',').map((id) => id.trim()).filter(Boolean);
+  if (ids.length > 0) {
+    return ids
+      .map((id) => {
+        const cat = getCategoryById(id);
+        if (!cat) return fallbackLabel || id;
+        return `${cat.label} (${cat.minAge} a ${cat.maxAge} años)`;
+      })
+      .join(' | ');
+  }
+  return fallbackLabel.replace(/\banos\b/gi, 'años');
+}
+
 export function getCategoryById(id: string): Category | undefined {
   return CATEGORIES.find((c) => c.id === id);
 }

@@ -9,7 +9,12 @@ import {
   isApiEnabled,
 } from '../utils/storage';
 import { calculateAge, formatDate, generateId, parseSheetDate } from '../utils/age';
-import { getCategoriesForAge, getCategoryById, validateCategorySelection } from '../types';
+import {
+  formatCategoryDisplayLabel,
+  getCategoriesForAge,
+  getCategoryById,
+  validateCategorySelection,
+} from '../types';
 import type { Event, EventSavePayload, Registration } from '../types';
 import Swal from 'sweetalert2';
 
@@ -152,8 +157,8 @@ function renderRegistrationRow(reg: Registration): string {
     <tr class="border-b border-secondary/10 hover:bg-secondary/5" data-id="${reg.id}">
       <td class="px-3 py-3 text-sm">#${reg.numeroPiloto}</td>
       <td class="px-3 py-3 text-sm">${reg.nombre} ${reg.apellido}</td>
-      <td class="px-3 py-3 text-sm hidden md:table-cell">${reg.edad} anos</td>
-      <td class="px-3 py-3 text-sm hidden lg:table-cell">${reg.categoriaLabel}</td>
+      <td class="px-3 py-3 text-sm hidden md:table-cell">${reg.edad} años</td>
+      <td class="px-3 py-3 text-sm hidden lg:table-cell">${formatCategoryDisplayLabel(reg.categoriaId, reg.categoriaLabel)}</td>
       <td class="px-3 py-3 text-sm hidden lg:table-cell">${reg.ciudad}</td>
       <td class="px-3 py-3 text-sm hidden xl:table-cell">${reg.celular}</td>
       <td class="px-3 py-3 text-sm text-center">${renderDocumentLinkCell(reg.identificacionArchivo, 'Ver cédula', 'Ver cédula')}</td>

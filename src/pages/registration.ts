@@ -203,7 +203,7 @@ function updateCategories(age: number): void {
     return;
   }
 
-  ageDisplay.textContent = `Edad calculada: ${age} anos`;
+  ageDisplay.textContent = `Edad calculada: ${age} años`;
   ageDisplay.classList.remove('hidden');
 
   const categories = getCategoriesForAge(age);
