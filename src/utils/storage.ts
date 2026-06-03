@@ -265,9 +265,11 @@ export async function updateRegistration(
   }
 
   if (updates.categoriaId) {
-    const firstId = updates.categoriaId.split(',')[0]?.trim();
-    const cat = firstId ? getCategoryById(firstId) : undefined;
-    merged.categoriaLabel = cat?.label ?? updates.categoriaId;
+    const categoryIds = updates.categoriaId.split(',').map((id) => id.trim()).filter(Boolean);
+    const categoryError = validateCategorySelection(categoryIds);
+    if (categoryError) throw new Error(categoryError);
+    merged.categoriaId = categoryIds.join(',');
+    merged.categoriaLabel = categoryIds.map((id) => getCategoryById(id)?.label ?? id).join('|');
   }
 
   registrations[index] = merged;

@@ -8,7 +8,7 @@ import {
   isApiEnabled,
 } from '../utils/storage';
 import { calculateAge, formatDate, generateId, parseSheetDate } from '../utils/age';
-import { getCategoriesForAge } from '../types';
+import { getCategoriesForAge, getCategoryById, validateCategorySelection } from '../types';
 import type { Event, Registration } from '../types';
 import Swal from 'sweetalert2';
 
@@ -87,6 +87,50 @@ function renderLogin(): string {
     </div>`;
 }
 
+
+function parseCategoryIds(value: string): string[] {
+  return value
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
+
+function renderCategoryCheckboxes(age: number, selected: string[] = []): string {
+  const categories = getCategoriesForAge(age);
+  if (categories.length === 0) {
+    return '<p class="text-sm text-gray-light">Sin categorias disponibles para esta edad.</p>';
+  }
+  return `<div class="edit-categoria-checkboxes space-y-2">
+    ${categories
+      .map(
+        (c) => `
+      <label class="flex items-center gap-3 rounded-lg border border-secondary/20 bg-primary/40 px-3 py-2 cursor-pointer hover:border-secondary/50">
+        <input type="checkbox" name="categoriaIds" value="${c.id}" class="accent-secondary h-4 w-4" ${selected.includes(c.id) ? 'checked' : ''} />
+        <span class="text-sm font-medium">${c.label}</span>
+      </label>`
+      )
+      .join('')}
+  </div>`;
+}
+
+function refreshEditFormCategories(form: HTMLFormElement): void {
+  const birthInput = form.querySelector<HTMLInputElement>('input[name="fechaNacimiento"]');
+  const container = form.querySelector<HTMLElement>('.edit-categoria-container');
+  if (!birthInput || !container) return;
+
+  const selected = Array.from(form.querySelectorAll<HTMLInputElement>('input[name="categoriaIds"]:checked')).map(
+    (el) => el.value
+  );
+  const age = birthInput.value ? calculateAge(parseSheetDate(birthInput.value)) : -1;
+
+  if (age < 0) {
+    container.innerHTML = '<p class="text-sm text-gray-light">Fecha invalida</p>';
+    return;
+  }
+
+  container.innerHTML = renderCategoryCheckboxes(age, selected);
+}
+
 function renderDocumentLinkCell(url: string | undefined, title: string, ariaLabel: string): string {
   const link = url?.trim() ?? '';
   if (!isHttpUrl(link)) {
@@ -98,7 +142,7 @@ function renderDocumentLinkCell(url: string | undefined, title: string, ariaLabe
 }
 
 function renderRegistrationRow(reg: Registration): string {
-  const firstCategoryId = reg.categoriaId.split(',')[0]?.trim() ?? '';
+  const selectedCategoryIds = parseCategoryIds(reg.categoriaId);
   const birthDate = parseSheetDate(reg.fechaNacimiento);
   const ageForCategories = birthDate ? calculateAge(birthDate) : reg.edad;
   const categoryAge = ageForCategories >= 0 ? ageForCategories : reg.edad;
@@ -129,14 +173,10 @@ function renderRegistrationRow(reg: Registration): string {
           <input type="text" name="ciudad" value="${reg.ciudad}" placeholder="Ciudad" class="input-field text-sm" required />
           <input type="text" name="marcaMoto" value="${reg.marcaMoto}" placeholder="Marca moto" class="input-field text-sm" required />
           <input type="number" name="numeroPiloto" value="${reg.numeroPiloto}" min="4" max="999" class="input-field text-sm" required />
-          <select name="categoriaId" class="input-field text-sm" required>
-            ${getCategoriesForAge(categoryAge)
-              .map(
-                (c) =>
-                  `<option value="${c.id}" ${c.id === firstCategoryId ? 'selected' : ''}>${c.label}</option>`
-              )
-              .join('')}
-          </select>
+          <div class="sm:col-span-2 lg:col-span-3">
+            <p class="text-sm text-secondary mb-2 font-medium">Categorias *</p>
+            <div class="edit-categoria-container">${renderCategoryCheckboxes(categoryAge, selectedCategoryIds)}</div>
+          </div>
           <div class="sm:col-span-2 lg:col-span-3 flex gap-2">
             <button type="submit" class="btn-secondary text-sm py-2 px-4">Guardar</button>
             <button type="button" class="cancel-edit btn-outline text-sm py-2 px-4" data-id="${reg.id}">Cancelar</button>
@@ -455,18 +495,34 @@ function bindAdminEvents(events: Event[]): void {
   });
 
   document.querySelectorAll('.edit-form').forEach((form) => {
+    const birthInput = form.querySelector<HTMLInputElement>('input[name="fechaNacimiento"]');
+    birthInput?.addEventListener('change', () => refreshEditFormCategories(form as HTMLFormElement));
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const id = form.getAttribute('data-id')!;
       const fd = new FormData(form as HTMLFormElement);
       const fechaNacimiento = parseSheetDate(fd.get('fechaNacimiento') as string);
-      const catId = fd.get('categoriaId') as string;
-      const cat = getCategoriesForAge(calculateAge(fechaNacimiento)).find((c) => c.id === catId);
+      const categoriaIds = fd.getAll('categoriaIds').map(String);
+      const validCategories = getCategoriesForAge(calculateAge(fechaNacimiento));
 
       if (!fechaNacimiento) {
         await showError('Fecha invalida', 'Revisa la fecha de nacimiento.');
         return;
       }
+
+      if (categoriaIds.length === 0 || !categoriaIds.every((cid) => validCategories.some((c) => c.id === cid))) {
+        await showError('Categorias', 'Selecciona al menos una categoria valida para la edad del piloto.');
+        return;
+      }
+
+      const categoryError = validateCategorySelection(categoriaIds);
+      if (categoryError) {
+        await showError('Categorias', categoryError);
+        return;
+      }
+
+      const categoriaLabel = categoriaIds.map((cid) => getCategoryById(cid)?.label ?? cid).join('|');
 
       showSaving('Guardando inscripcion...');
       try {
@@ -479,8 +535,8 @@ function bindAdminEvents(events: Event[]): void {
           ciudad: fd.get('ciudad') as string,
           marcaMoto: fd.get('marcaMoto') as string,
           numeroPiloto: Number(fd.get('numeroPiloto')),
-          categoriaId: catId,
-          categoriaLabel: cat?.label ?? catId,
+          categoriaId: categoriaIds.join(','),
+          categoriaLabel,
         });
         Swal.close();
         await showSuccess('Inscripcion actualizada', 'Los cambios se guardaron correctamente.');
