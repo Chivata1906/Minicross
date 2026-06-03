@@ -1,0 +1,14 @@
+#!/bin/sh
+# Bloquea AGREGAR node_modules o dist al repo (permitir borrarlos del historial)
+
+blocked=$(git diff --cached --name-only --diff-filter=AM | grep -E '^(node_modules/|dist/)')
+
+if [ -n "$blocked" ]; then
+  echo ""
+  echo "ERROR: No puedes agregar archivos en node_modules/ ni dist/"
+  echo "Usa: npm install  y  npm run build  (localmente, no en git)."
+  echo ""
+  exit 1
+fi
+
+exit 0
