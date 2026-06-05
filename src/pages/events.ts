@@ -33,7 +33,7 @@ function renderStatusBadge(event: Event): string {
 
 function renderEventCard(event: Event): string {
   const reglamentoBtn = isHttpUrl(event.reglamentoUrl)
-    ? `<a href="${event.reglamentoUrl}" target="_blank" rel="noopener noreferrer" class="btn-outline w-full sm:w-auto text-center">Ver reglamento</a>`
+    ? `<a href="${event.reglamentoUrl}" target="_blank" rel="noopener noreferrer" class="btn-outline w-full sm:w-auto text-center">Ver convocatoria</a>`
     : '';
   const resultadosBtn = event.finished
     ? `<a href="./resultados.html?evento=${event.id}" class="btn-secondary w-full sm:w-auto text-center">Ver resultados</a>`

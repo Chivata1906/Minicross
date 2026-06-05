@@ -306,7 +306,7 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
                   <input type="checkbox" class="event-finished-toggle accent-accent" data-id="${e.id}" ${e.finished ? 'checked' : ''} />
                   Finalizado
                 </label>
-                ${e.reglamentoUrl?.trim() ? '<a href="' + e.reglamentoUrl + '" target="_blank" rel="noopener noreferrer" class="text-secondary text-sm hover:text-accent">Ver reglamento</a>' : '<span class="text-xs text-gray-light">Sin reglamento</span>'}
+                ${e.reglamentoUrl?.trim() ? '<a href="' + e.reglamentoUrl + '" target="_blank" rel="noopener noreferrer" class="text-secondary text-sm hover:text-accent">Ver convocatoria</a>' : '<span class="text-xs text-gray-light">Sin convocatoria</span>'}
                 <button class="edit-event-btn text-secondary text-sm hover:text-accent" data-id="${e.id}">Editar</button>
                 <button class="delete-event-btn text-orange text-sm hover:text-accent" data-id="${e.id}">Eliminar</button>
               </div>`
