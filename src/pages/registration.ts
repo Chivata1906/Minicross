@@ -19,6 +19,26 @@ let paymentFileData = '';
 let paymentFileName = '';
 let paymentFileType = '';
 
+const TERMS_MODAL_HTML = `
+  <div style="text-align:left;font-size:0.875rem;line-height:1.65;max-height:60vh;overflow-y:auto;padding:0 0.25rem;">
+    <p style="margin:0 0 1rem;">Al completar el proceso de inscripción al Campeonato Junior Minicross 2026, el participante y su padre, madre o representante legal declaran haber leído y aceptado el reglamento oficial del campeonato.</p>
+    <p style="margin:0 0 1rem;">El participante se compromete a cumplir las normas deportivas, técnicas y disciplinarias establecidas por la organización, así como a utilizar los elementos de seguridad obligatorios durante cada competencia.</p>
+    <p style="margin:0 0 1rem;">El padre, madre o representante legal certifica que el menor se encuentra en condiciones físicas adecuadas para participar y asume la responsabilidad derivada de su participación en el evento.</p>
+    <p style="margin:0 0 1rem;">La organización podrá realizar ajustes en horarios, cronogramas, sedes o actividades por motivos de seguridad, fuerza mayor o condiciones climáticas, informando oportunamente a los participantes.</p>
+    <p style="margin:0 0 1rem;">Asimismo, el participante y su representante legal autorizan el uso de fotografías, videos y demás material audiovisual captado durante el campeonato para fines informativos, promocionales y publicitarios relacionados con Minicross 2026, sin que ello genere compensación económica.</p>
+    <p style="margin:0 0 1rem;">La inscripción se considerará válida únicamente cuando se haya completado el registro, realizado el pago correspondiente y entregado la documentación requerida por la organización.</p>
+    <p style="margin:0;font-weight:600;">Al marcar la casilla de aceptación y finalizar la inscripción, el participante y su representante legal aceptan estos términos y condiciones.</p>
+  </div>`;
+
+function showTermsModal(): void {
+  void Swal.fire({
+    title: 'Términos y Condiciones',
+    html: TERMS_MODAL_HTML,
+    confirmButtonText: 'Entendido',
+    width: '42rem',
+  });
+}
+
 function getEventIdFromUrl(): string | null {
   return new URLSearchParams(window.location.search).get('evento');
 }
@@ -206,7 +226,25 @@ function renderForm(events: Event[], selectedEventId: string | null, pilotNumber
         <p id="payment-preview" class="mt-2 text-sm text-gray-light hidden"></p>
       </div>
 
-      <button type="submit" class="btn-primary w-full text-lg py-4">Enviar inscripción</button>
+      <div class="rounded-xl border border-secondary/20 bg-primary/40 p-4">
+        <label class="flex items-start gap-3 cursor-pointer" for="acceptTerms">
+          <input type="checkbox" id="acceptTerms" name="acceptTerms" required
+                 class="accent-secondary mt-1 h-4 w-4 shrink-0" />
+          <span class="text-sm text-gray-light leading-relaxed">
+            Acepto los
+            <button type="button" id="terms-modal-btn"
+                    class="text-secondary underline underline-offset-2 hover:text-accent font-medium transition-colors">
+              términos y condiciones
+            </button>
+          </span>
+        </label>
+      </div>
+
+      <button type="submit" id="submit-registration"
+              class="btn-primary w-full text-lg py-4 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent disabled:hover:shadow-none"
+              disabled>
+        Enviar inscripción
+      </button>
     </form>`;
 }
 
@@ -333,6 +371,18 @@ function bindRegistrationForm(events: Event[]): void {
   const fileInput = document.getElementById('idFile') as HTMLInputElement | null;
   const paymentInput = document.getElementById('paymentFile') as HTMLInputElement | null;
   const categoriaContainer = document.getElementById('categoria-container');
+  const acceptTerms = document.getElementById('acceptTerms') as HTMLInputElement | null;
+  const submitBtn = document.getElementById('submit-registration') as HTMLButtonElement | null;
+
+  document.getElementById('terms-modal-btn')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showTermsModal();
+  });
+
+  acceptTerms?.addEventListener('change', () => {
+    if (submitBtn) submitBtn.disabled = !acceptTerms.checked;
+  });
 
   eventSelect?.addEventListener('change', () => {
     if (eventSelect.value) void refreshPilotSelect(eventSelect.value);
@@ -423,6 +473,15 @@ function bindRegistrationForm(events: Event[]): void {
       return;
     }
 
+    if (!acceptTerms?.checked) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Términos y condiciones',
+        text: 'Debes aceptar los términos y condiciones para enviar la inscripción.',
+      });
+      return;
+    }
+
     Swal.fire({
       title: 'Enviando inscripción...',
       allowOutsideClick: false,
@@ -462,6 +521,8 @@ function bindRegistrationForm(events: Event[]): void {
       });
 
       form.reset();
+      if (acceptTerms) acceptTerms.checked = false;
+      if (submitBtn) submitBtn.disabled = true;
       idFileData = '';
       idFileName = '';
       idFileType = '';
