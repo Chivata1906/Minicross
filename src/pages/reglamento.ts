@@ -111,7 +111,7 @@ export function initReglamentoPage(): void {
     ${renderNavbar('reglamento')}
     <main class="mx-auto max-w-7xl px-4 py-10 md:py-14 md:px-6">
       <header class="text-center mb-10 md:mb-14">
-        <p class="text-secondary font-semibold tracking-widest uppercase text-sm mb-2">Campeonato Junior Minicross Colombia</p>
+        <p class="text-secondary font-semibold tracking-widest uppercase text-sm mb-2">Campeonato Junior Minicross</p>
         <h1 class="section-title text-4xl md:text-5xl lg:text-6xl">Reglamento oficial</h1>
         <p class="mt-4 max-w-2xl mx-auto text-gray-light leading-relaxed">
           Normas oficiales del campeonato. Al inscribirte aceptas este reglamento en su totalidad.

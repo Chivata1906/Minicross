@@ -18,7 +18,7 @@ export const REGLAMENTO_SECTIONS: ReglamentoSection[] = [
     id: 'generalidades',
     title: '1. Generalidades',
     paragraphs: [
-      'El Campeonato Junior Minicross Colombia es un campeonato privado de formación deportiva enfocado en el desarrollo infantil y juvenil del motocross, inspirado en el formato norteamericano de competencias amateur tipo "Mini O\'s".',
+      'El Campeonato Junior Minicross es un campeonato privado de formación deportiva enfocado en el desarrollo infantil y juvenil del motocross, inspirado en el formato norteamericano de competencias amateur tipo "Mini O\'s".',
       'El campeonato tiene como objetivo fomentar el crecimiento progresivo de nuevos pilotos, priorizando la seguridad, el aprendizaje deportivo, la igualdad competitiva y la proyección deportiva de niños y jóvenes dentro del motocross.',
       'El campeonato contará con reglamentación propia y será administrado exclusivamente por la organización del evento.',
       'Todos los pilotos, padres de familia, acompañantes, mecánicos y equipos participantes aceptan el presente reglamento desde el momento de realizar la inscripción.',

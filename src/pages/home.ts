@@ -16,10 +16,10 @@ export function initHomePage(): void {
             <h1 class="font-title text-5xl leading-tight tracking-wider md:text-7xl">
               CAMPEONATO<br/>
               <span class="text-accent">MINICROSS</span><br/>
-              COLOMBIA 2026
+              2026
             </h1>
             <p class="mt-6 text-lg text-gray-light leading-relaxed">
-              Campeonato privado de formación del motocross en Colombia, pensado para pilotos
+              Campeonato privado de formación en motocross juvenil, pensado para pilotos
               infantiles y juveniles. Siete categorías oficiales de 50 cc a 125 cc Junior,
               formato Triple Corona con tres mangas por válida y un entorno seguro para que
               compitan, aprendan y crezcan en pista.
@@ -30,7 +30,7 @@ export function initHomePage(): void {
             </div>
           </div>
           <div class="flex justify-center animate-fade-in-up">
-            <img src="./logo-copa-junior-minicross.png" alt="Logo Copa Junior Minicross Colombia 2026"
+            <img src="./logo-copa-junior-minicross.png" alt="Logo Copa Junior Minicross 2026"
                  class="max-w-sm rounded-2xl shadow-glow-yellow md:max-w-md" />
           </div>
         </div>
@@ -42,7 +42,7 @@ export function initHomePage(): void {
         <h2 class="section-title text-center mb-12">¿Qué es el Minicross?</h2>
         <div class="mx-auto max-w-3xl text-center text-gray-light leading-relaxed space-y-4 mb-12">
           <p>
-            El Minicross es un campeonato creado para fortalecer e impulsar el semillero del motocross en Colombia.
+            El Minicross es un campeonato creado para fortalecer e impulsar el semillero del motocross juvenil.
             Su propósito es brindar a niños y jóvenes un espacio seguro, organizado y competitivo donde puedan
             desarrollar sus habilidades deportivas, adquirir experiencia y crecer dentro de este apasionante deporte.
           </p>
@@ -61,7 +61,7 @@ export function initHomePage(): void {
           <div class="card text-center">
             <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-secondary/20 text-3xl">🏆</div>
             <h3 class="font-title text-2xl tracking-wide text-accent mb-3">Triple Corona</h3>
-            <p class="text-gray-light">Tres mangas decisivas en cada válida. Acumula puntos, demuestra tu talento y compite por el título nacional.</p>
+            <p class="text-gray-light">Tres mangas decisivas en cada válida. Acumula puntos, demuestra tu talento y compite por el título del campeonato.</p>
           </div>
           <div class="card text-center">
             <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-secondary/20 text-3xl">⚡</div>
@@ -101,7 +101,7 @@ export function initHomePage(): void {
     <section class="border-t border-secondary/20 bg-blue-medium/30 py-16">
       <div class="mx-auto max-w-4xl px-4 text-center">
         <h2 class="section-title mb-4">¿Listo para la acción?</h2>
-        <p class="text-gray-light mb-8 text-lg">Inscríbete en la próxima válida y forma parte del Campeonato Minicross Colombia 2026.</p>
+        <p class="text-gray-light mb-8 text-lg">Inscríbete en la próxima válida y forma parte del Campeonato Minicross 2026.</p>
         <a href="./inscripcion.html" class="btn-primary text-lg px-10 py-4">Registrarme como piloto</a>
       </div>
     </section>

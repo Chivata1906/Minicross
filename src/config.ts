@@ -1,5 +1,5 @@
 /**
- * Configuracion del sitio Minicross Colombia 2026
+ * Configuracion del sitio Minicross 2026
  *
  * PANEL: /panel-minicross-gestion-2026.html
  * Clave: minicross2026
