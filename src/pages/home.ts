@@ -75,7 +75,7 @@ export function initHomePage(): void {
     <section class="py-16 dirt-texture">
       <div class="mx-auto max-w-7xl px-4">
         <h2 class="section-title text-center mb-4">Categorías 2026</h2>
-        <p class="text-center text-gray-light mb-10 max-w-2xl mx-auto">Compite en la categoría que corresponda a tu edad al momento del evento.</p>
+        <p class="text-center text-gray-light mb-10 max-w-2xl mx-auto">Compite en la categoría que corresponda a tu edad al 1 de enero del año del campeonato.</p>
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           ${[
             ['50cc', '4 – 6 años'],

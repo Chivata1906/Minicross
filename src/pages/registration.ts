@@ -7,7 +7,7 @@ import {
   getAvailablePilotNumbers,
   readFileAsDataUrl,
 } from '../utils/storage';
-import { calculateAge, formatDate } from '../utils/age';
+import { calculateCategoryAge, formatDate } from '../utils/age';
 import { getCategoriesForAge, formatCategoryOptionLabel, type Event } from '../types';
 import { formatCop } from '../utils/registration-total';
 import Swal from 'sweetalert2';
@@ -292,7 +292,7 @@ function updateCategories(age: number, events: Event[]): void {
     return;
   }
 
-  ageDisplay.textContent = `Edad calculada: ${age} años`;
+  ageDisplay.textContent = `Edad al 1 de enero de ${CONFIG.championshipYear}: ${age} años`;
   ageDisplay.classList.remove('hidden');
 
   const categories = getCategoriesForAge(age);
@@ -390,7 +390,7 @@ function bindRegistrationForm(events: Event[]): void {
   });
 
   birthInput?.addEventListener('change', () => {
-    if (birthInput.value) updateCategories(calculateAge(birthInput.value), events);
+    if (birthInput.value) updateCategories(calculateCategoryAge(birthInput.value, CONFIG.championshipYear), events);
   });
 
   categoriaContainer?.addEventListener('change', (e) => {
@@ -439,7 +439,7 @@ function bindRegistrationForm(events: Event[]): void {
 
     const fd = new FormData(form);
     const fechaNacimiento = fd.get('fechaNacimiento') as string;
-    const edad = calculateAge(fechaNacimiento);
+    const edad = calculateCategoryAge(fechaNacimiento, CONFIG.championshipYear);
     const categoriaIds = getSelectedCategoryIds();
 
     if (edad < 0) {

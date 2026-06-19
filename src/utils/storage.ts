@@ -1,6 +1,6 @@
 import { CONFIG } from '../config';
 import type { AppData, Event, EventSavePayload, Registration, RegistrationFormData } from '../types';
-import { calculateAge, generateId, parseSheetDate } from './age';
+import { calculateCategoryAge, generateId, parseSheetDate } from './age';
 import { getCategoryById, formatCategoryOptionLabel, validateCategorySelection } from '../types';
 import { computeRegistrationTotal } from './registration-total';
 import {
@@ -197,7 +197,7 @@ export async function createRegistration(data: RegistrationFormData): Promise<Re
   if (categoryError) throw new Error(categoryError);
 
   const { categoriaId, categoriaLabel } = resolveCategoryFields(data.categoriaIds);
-  const edad = calculateAge(data.fechaNacimiento);
+  const edad = calculateCategoryAge(data.fechaNacimiento, CONFIG.championshipYear);
   const now = new Date().toISOString();
   const events = await loadEvents();
   const event = events.find((e) => e.id === data.eventId);
@@ -276,7 +276,7 @@ export async function updateRegistration(
 
   if (updates.fechaNacimiento) {
     merged.fechaNacimiento = parseSheetDate(updates.fechaNacimiento);
-    merged.edad = calculateAge(merged.fechaNacimiento);
+    merged.edad = calculateCategoryAge(merged.fechaNacimiento, CONFIG.championshipYear);
   }
 
   if (updates.categoriaId) {

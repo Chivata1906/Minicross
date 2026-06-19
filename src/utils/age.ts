@@ -8,6 +8,14 @@ export function calculateAge(birthDate: string, referenceDate: Date = new Date()
   return age;
 }
 
+/** Edad para categorías: cumplida al 1 de enero del año del campeonato. */
+export function calculateCategoryAge(birthDate: string, championshipYear: number): number {
+  const normalized = parseSheetDate(birthDate);
+  if (!normalized) return -1;
+  const referenceDate = new Date(`${championshipYear}-01-01T12:00:00`);
+  return calculateAge(normalized, referenceDate);
+}
+
 /** Normaliza fechas de Google Sheets (serial, ISO, texto). */
 export function parseSheetDate(value: unknown): string {
   if (value == null || value === '') return '';

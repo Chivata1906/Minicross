@@ -7,6 +7,9 @@
 export const CONFIG = {
   adminPassword: 'minicross2026',
 
+  /** Año del campeonato; la edad para categorías se calcula al 1 de enero de este año. */
+  championshipYear: 2026,
+
   apiUrl:
     'https://script.google.com/macros/s/AKfycbzOsYJzbNYJ7DUPTTJ4lp2x5svHEkFXOKvTruZV1X_JvsrukeBdfEWkcoe4WnYXN6Ck/exec' as string,
 

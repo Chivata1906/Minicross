@@ -9,7 +9,7 @@ import {
   deleteRegistration,
   isApiEnabled,
 } from '../utils/storage';
-import { calculateAge, formatDate, generateId, parseSheetDate } from '../utils/age';
+import { calculateCategoryAge, formatDate, generateId, parseSheetDate } from '../utils/age';
 import { exportRegistrations, type ExportFormat } from '../utils/export-registrations';
 import { formatCop, resolveRegistrationTotal } from '../utils/registration-total';
 import {
@@ -131,7 +131,9 @@ function refreshEditFormCategories(form: HTMLFormElement): void {
   const selected = Array.from(form.querySelectorAll<HTMLInputElement>('input[name="categoriaIds"]:checked')).map(
     (el) => el.value
   );
-  const age = birthInput.value ? calculateAge(parseSheetDate(birthInput.value)) : -1;
+  const age = birthInput.value
+    ? calculateCategoryAge(parseSheetDate(birthInput.value), CONFIG.championshipYear)
+    : -1;
 
   if (age < 0) {
     container.innerHTML = '<p class="text-sm text-gray-light">Fecha invalida</p>';
@@ -154,7 +156,9 @@ function renderDocumentLinkCell(url: string | undefined, title: string, ariaLabe
 function renderRegistrationRow(reg: Registration, events: Event[]): string {
   const selectedCategoryIds = parseCategoryIds(reg.categoriaId);
   const birthDate = parseSheetDate(reg.fechaNacimiento);
-  const ageForCategories = birthDate ? calculateAge(birthDate) : reg.edad;
+  const ageForCategories = birthDate
+    ? calculateCategoryAge(birthDate, CONFIG.championshipYear)
+    : reg.edad;
   const categoryAge = ageForCategories >= 0 ? ageForCategories : reg.edad;
   const totalLabel = formatCop(resolveRegistrationTotal(reg, events));
 
@@ -647,7 +651,9 @@ function bindAdminEvents(events: Event[], registrations: Registration[]): void {
       const fd = new FormData(form as HTMLFormElement);
       const fechaNacimiento = parseSheetDate(fd.get('fechaNacimiento') as string);
       const categoriaIds = fd.getAll('categoriaIds').map(String);
-      const validCategories = getCategoriesForAge(calculateAge(fechaNacimiento));
+      const validCategories = getCategoriesForAge(
+        calculateCategoryAge(fechaNacimiento, CONFIG.championshipYear)
+      );
 
       if (!fechaNacimiento) {
         await showError('Fecha invalida', 'Revisa la fecha de nacimiento.');
