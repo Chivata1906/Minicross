@@ -188,32 +188,24 @@ function renderForm(events: Event[], selectedEventId: string | null, pilotNumber
             Datos para realizar el pago
           </p>
           <p class="text-xs text-gray-light">
-            Transfiere el total indicado a la siguiente cuenta de ahorros y adjunta el comprobante más abajo.
+            Transfiere el total indicado con los siguientes datos y adjunta el comprobante más abajo.
           </p>
           <dl class="grid gap-2 sm:grid-cols-2 text-sm">
-            <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5">
-              <dt class="text-xs text-gray-light mb-0.5">Titular</dt>
-              <dd class="font-medium text-white">Cogua moto park sas</dd>
-            </div>
-            <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5">
-              <dt class="text-xs text-gray-light mb-0.5">NIT</dt>
-              <dd class="font-medium text-white font-mono">90203908</dd>
-            </div>
-            <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5">
-              <dt class="text-xs text-gray-light mb-0.5">Banco</dt>
-              <dd class="font-medium text-white">BBVA</dd>
-            </div>
             <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5">
               <dt class="text-xs text-gray-light mb-0.5">Tipo de cuenta</dt>
               <dd class="font-medium text-white">Ahorros</dd>
             </div>
-            <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5 sm:col-span-2">
-              <dt class="text-xs text-gray-light mb-0.5">Número de cuenta</dt>
-              <dd class="font-medium text-accent font-mono text-base tracking-wide">0180011666</dd>
+            <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5">
+              <dt class="text-xs text-gray-light mb-0.5">Nombre del producto</dt>
+              <dd class="font-medium text-white">Ahorro Libretón</dd>
             </div>
             <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5 sm:col-span-2">
-              <dt class="text-xs text-gray-light mb-0.5">Llave</dt>
-              <dd class="font-medium text-accent font-mono text-base tracking-wide">0091823623</dd>
+              <dt class="text-xs text-gray-light mb-0.5">Número de contrato</dt>
+              <dd class="font-medium text-accent font-mono text-base tracking-wide">0021357124</dd>
+            </div>
+            <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5 sm:col-span-2">
+              <dt class="text-xs text-gray-light mb-0.5">Llave BBVA</dt>
+              <dd class="font-medium text-accent font-mono text-base tracking-wide">@bbva3146105217</dd>
             </div>
           </dl>
         </div>
