@@ -82,9 +82,15 @@ npm run build
 | valorInscripcion | Valor de inscripcion por categoria (COP, numero) |
 | resultadosUrl | URL del JSON de resultados en Drive (carpeta Resultados). Si esta vacio, no se muestra Ver resultados |
 
-Tras actualizar el script, vuelve a **Implementar > Administrar implementaciones > Nueva version** y ejecuta **repairEventsSheet** (o **repairAllSheets**) para agregar la columna `resultadosUrl`.
+Tras actualizar el script, vuelve a **Implementar > Administrar implementaciones > Nueva version**.
 
-Si agregaste columnas manualmente, ejecuta **repairEventsSheet** o **repairAllSheets** en Apps Script (deben aparecer en el selector de funciones tras pegar el script actualizado).
+**No necesitas ejecutar `repairAllSheets`.** Esa funcion es solo para columnas cruzadas/desordenadas y puede fallar con el error generico de Google. Opciones seguras (ninguna borra datos):
+
+1. **Recomendada:** redeployar y abrir el panel admin una vez. Al consultar eventos, el script agrega solo la columna faltante al final.
+2. **Manual:** en la hoja `Events`, escribe `resultadosUrl` en la siguiente celda vacia de la fila 1 (encabezados). Deja las celdas de datos vacias en esa columna.
+3. Si el editor ejecuta codigo: prueba `ping` (si falla, es un fallo del editor de Google, no de tus datos). Luego opcionalmente `addMissingEventColumns`.
+
+Si agregaste columnas manualmente, ejecuta **repairEventsSheet** o **repairAllSheets** en Apps Script **solo si** las columnas estan cruzadas/desordenadas (esas si crean backup y reescriben).
 
 > **Importante:** Las funciones `repair*` crean una **copia de seguridad** de la hoja (`BACKUP_Registrations_...`) antes de remapear columnas. El uso normal del sitio **solo agrega columnas nuevas** al final y **no borra inscripciones**. Ejecuta `repair*` solo si las columnas estan cruzadas/desordenadas.
 

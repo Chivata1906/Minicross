@@ -802,6 +802,7 @@ function syncEventHeadersFull_(ss, sheet, headers) {
     row.active = parseBoolField_(row.active);
     row.finished = parseBoolField_(row.finished);
     if (!row.reglamentoUrl) row.reglamentoUrl = '';
+    if (!row.resultadosUrl) row.resultadosUrl = '';
     row.valorInscripcion = Number(row.valorInscripcion) || 0;
   });
   writeObjects_(sheet, headers, remapRowsToHeaders_(rows, headers));
@@ -864,12 +865,15 @@ function repairEventsSheet() {
     Logger.log('Hoja Events creada con columnas correctas.');
     return;
   }
+
+  // Primero intenta agregar columnas faltantes sin borrar datos (ej. resultadosUrl).
+  ensureSheetHeaders_(sheet, EVENT_HEADERS);
   var current = readSheetHeaders_(sheet);
   if (headersMatchInOrder_(current, EVENT_HEADERS)) {
-    ensureSheetHeaders_(sheet, EVENT_HEADERS);
     Logger.log('Hoja Events OK. Filas: ' + Math.max(0, sheet.getLastRow() - 1));
     return;
   }
+
   var backupName = backupSheet_(sheet);
   Logger.log('Backup creado: ' + backupName);
   syncEventHeadersFull_(ss, sheet, EVENT_HEADERS);
@@ -897,10 +901,41 @@ function repairRegistrationsSheet() {
   Logger.log('Hoja Registrations reparada. Filas: ' + Math.max(0, sheet.getLastRow() - 1));
 }
 
+/**
+ * Prueba minima del editor. Si ESTA falla con "error desconocido",
+ * el problema es de Google Apps Script (no del codigo ni de tus datos).
+ */
+function ping() {
+  Logger.log('ping OK - el editor puede ejecutar codigo');
+}
+
+/**
+ * Solo agrega columnas nuevas a Events (p. ej. resultadosUrl) sin backup ni remapear.
+ * NUNCA borra filas. Usa ESTA solo si quieres forzar la columna desde el editor.
+ * En la practica NO es obligatoria: al usar el sitio, getEvents_ ya agrega columnas faltantes.
+ */
+function addMissingEventColumns() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = getEventsSheet_(ss);
+  ensureSheetHeaders_(sheet, EVENT_HEADERS);
+  Logger.log('Encabezados Events: ' + readSheetHeaders_(sheet).join(', '));
+  Logger.log('Listo. Ninguna fila fue borrada.');
+}
+
 /** Repara Events y Registrations en una sola ejecucion. */
 function repairAllSheets() {
-  repairEventsSheet();
-  repairRegistrationsSheet();
+  try {
+    repairEventsSheet();
+  } catch (err) {
+    Logger.log('Error en Events: ' + (err && err.message ? err.message : err));
+    throw err;
+  }
+  try {
+    repairRegistrationsSheet();
+  } catch (err) {
+    Logger.log('Error en Registrations: ' + (err && err.message ? err.message : err));
+    throw err;
+  }
   Logger.log('Reparacion completada (Events + Registrations).');
 }
 
