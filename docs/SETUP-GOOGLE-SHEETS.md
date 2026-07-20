@@ -41,7 +41,7 @@ Con esta configuracion, las inscripciones se guardan directamente en una Google 
 2. Tipo: **Aplicacion web**
 3. Ejecutar como: **Yo**
 4. Quien tiene acceso: **Cualquier persona**
-5. Clic en **Implementar**
+5. Click en **Implementar**
 6. Copia la URL que termina en `/exec`
 
 ## Paso 5 — Conectar la pagina web
