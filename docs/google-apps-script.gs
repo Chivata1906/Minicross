@@ -10,7 +10,7 @@
 const SPREADSHEET_ID = '1g5crmfmbcxyvmLMXxYECxO90gFYiXf7P5JaSze7pmbI';
 const DRIVE_FOLDER_ID = '1oImoS0x__kgBBXaL9HAg3Qf-4Zj0Xz0l';
 
-const EVENT_HEADERS = ['id', 'name', 'date', 'location', 'city', 'description', 'active', 'reglamentoUrl', 'finished', 'valorInscripcion'];
+const EVENT_HEADERS = ['id', 'name', 'date', 'location', 'city', 'description', 'active', 'reglamentoUrl', 'finished', 'valorInscripcion', 'resultadosUrl'];
 const REG_HEADERS = [
   'id', 'eventId', 'eventName', 'nombre', 'apellido', 'identificacion',
   'identificacionArchivo', 'identificacionFileName', 'identificacionFileType',
@@ -18,6 +18,7 @@ const REG_HEADERS = [
   'fechaNacimiento', 'edad', 'email', 'celular', 'ciudad', 'marcaMoto',
   'numeroPiloto', 'categoriaId', 'categoriaLabel', 'valorTotalInscripcion', 'createdAt', 'updatedAt',
 ];
+const HEAT_KEYS = ['manga1', 'manga2', 'manga3', 'final'];
 
 // ─── HTTP handlers ───────────────────────────────────────────────────────────
 
@@ -48,6 +49,11 @@ function doGet(e) {
     return jsonResponse({ registrations: getRegistrations_(ss) });
   }
 
+  if (action === 'results') {
+    const eventId = (e.parameter.eventId || '').toString();
+    return jsonResponse({ results: getEventResults_(ss, eventId) });
+  }
+
   return jsonResponse({
     events: getEvents_(ss),
     registrations: getRegistrations_(ss),
@@ -74,6 +80,12 @@ function doPost(e) {
     case 'saveEvents':
       writeEvents_(ss, body.events);
       return jsonResponse({ success: true });
+    case 'saveResults':
+      try {
+        return jsonResponse(saveEventResults_(ss, body.data));
+      } catch (err) {
+        return jsonResponse({ success: false, error: err.message || String(err) });
+      }
     case 'saveRegistrations':
       try {
         writeRegistrations_(ss, body.registrations);
@@ -358,6 +370,7 @@ function getEvents_(ss) {
     evt.active = parseBoolField_(evt.active);
     evt.finished = parseBoolField_(evt.finished);
     if (!evt.reglamentoUrl) evt.reglamentoUrl = '';
+    if (!evt.resultadosUrl) evt.resultadosUrl = '';
     evt.valorInscripcion = Number(evt.valorInscripcion) || 0;
     return evt;
   });
@@ -463,7 +476,197 @@ function prepareEventRow_(ss, data) {
   } else if (!row.reglamentoUrl) {
     row.reglamentoUrl = '';
   }
+  if (data.resultadosUrl && String(data.resultadosUrl).indexOf('http') === 0) {
+    row.resultadosUrl = data.resultadosUrl;
+  } else if (!row.resultadosUrl) {
+    row.resultadosUrl = '';
+  }
   return row;
+}
+
+function getOrCreateResultsFolder_() {
+  var root = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+  var name = 'Resultados';
+  var folders = root.getFoldersByName(name);
+  if (folders.hasNext()) return folders.next();
+  return root.createFolder(name);
+}
+
+function uploadResultsBlob_(folder, base64DataUrl, fileName, mimeType) {
+  var parts = String(base64DataUrl || '').split(',');
+  var base64 = parts.length > 1 ? parts[1] : parts[0];
+  var blob = Utilities.newBlob(
+    Utilities.base64Decode(base64),
+    mimeType || 'application/octet-stream',
+    fileName
+  );
+  var file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return file.getUrl();
+}
+
+function findDriveFileByUrl_(url) {
+  if (!url || String(url).indexOf('http') !== 0) return null;
+  var match = String(url).match(/[-\w]{25,}/);
+  if (!match) return null;
+  try {
+    return DriveApp.getFileById(match[0]);
+  } catch (err) {
+    return null;
+  }
+}
+
+function processHeatUploads_(folder, eventId, eventName, categoryId, heatKey, heatData) {
+  if (!heatData) return null;
+
+  var result = {
+    columns: heatData.columns || [],
+    rows: heatData.rows || [],
+    commentColumn: heatData.commentColumn || null,
+    pdfUrl: heatData.pdfUrl || '',
+    csvUrl: heatData.csvUrl || '',
+  };
+
+  var suffixBase = sanitizeFileNamePart_(eventId) + '_' + sanitizeFileNamePart_(categoryId) + '_' + heatKey;
+
+  if (heatData.csvUpload && heatData.csvUpload.archivo && String(heatData.csvUpload.archivo).indexOf('data:') === 0) {
+    var csvName = buildDriveFileName_(
+      suffixBase,
+      eventName,
+      'CSV',
+      heatData.csvUpload.fileName || (heatKey + '.csv'),
+      heatData.csvUpload.fileType || 'text/csv'
+    );
+    result.csvUrl = uploadResultsBlob_(
+      folder,
+      heatData.csvUpload.archivo,
+      csvName,
+      heatData.csvUpload.fileType || 'text/csv'
+    );
+  }
+
+  if (heatKey !== 'final' && heatData.pdfUpload && heatData.pdfUpload.archivo && String(heatData.pdfUpload.archivo).indexOf('data:') === 0) {
+    var pdfName = buildDriveFileName_(
+      suffixBase,
+      eventName,
+      'VUELTAS',
+      heatData.pdfUpload.fileName || (heatKey + '.pdf'),
+      heatData.pdfUpload.fileType || 'application/pdf'
+    );
+    result.pdfUrl = uploadResultsBlob_(
+      folder,
+      heatData.pdfUpload.archivo,
+      pdfName,
+      heatData.pdfUpload.fileType || 'application/pdf'
+    );
+  }
+
+  if (!result.pdfUrl) delete result.pdfUrl;
+  if (!result.csvUrl) delete result.csvUrl;
+  return result;
+}
+
+function getEventResults_(ss, eventId) {
+  if (!eventId) return null;
+  var events = getEvents_(ss);
+  var event = null;
+  for (var i = 0; i < events.length; i++) {
+    if (events[i].id === eventId) {
+      event = events[i];
+      break;
+    }
+  }
+  if (!event || !event.resultadosUrl) return null;
+
+  var file = findDriveFileByUrl_(event.resultadosUrl);
+  if (!file) return null;
+
+  try {
+    var parsed = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+    return parsed;
+  } catch (err) {
+    return null;
+  }
+}
+
+function updateEventResultadosUrl_(ss, eventId, resultadosUrl) {
+  var sheet = getEventsSheet_(ss);
+  var objects = sheetToObjects_(sheet);
+  var changed = false;
+  objects.forEach(function (row) {
+    if (row.id === eventId) {
+      row.resultadosUrl = resultadosUrl;
+      changed = true;
+    }
+  });
+  if (changed) writeObjects_(sheet, EVENT_HEADERS, objects.map(function (row) {
+    return prepareEventRow_(ss, row);
+  }));
+}
+
+function saveEventResults_(ss, data) {
+  if (!data || !data.eventId) {
+    throw new Error('Falta eventId para guardar resultados.');
+  }
+
+  var eventName = data.eventName || getEventNameById_(ss, data.eventId) || data.eventId;
+  var folder = getOrCreateResultsFolder_();
+  var categories = (data.categories || []).map(function (cat) {
+    var out = {
+      categoryId: cat.categoryId,
+      categoryLabel: cat.categoryLabel || cat.categoryId,
+    };
+    HEAT_KEYS.forEach(function (heatKey) {
+      if (!cat[heatKey]) return;
+      out[heatKey] = processHeatUploads_(folder, data.eventId, eventName, cat.categoryId, heatKey, cat[heatKey]);
+    });
+    return out;
+  });
+
+  var results = {
+    eventId: data.eventId,
+    updatedAt: new Date().toISOString(),
+    categories: categories,
+  };
+
+  var jsonName = buildDriveFileName_(
+    data.eventId,
+    eventName,
+    'RESULTADOS',
+    'resultados.json',
+    'application/json'
+  );
+  var jsonBlob = Utilities.newBlob(JSON.stringify(results), 'application/json', jsonName);
+
+  var existingEvents = getEvents_(ss);
+  var existingUrl = '';
+  for (var i = 0; i < existingEvents.length; i++) {
+    if (existingEvents[i].id === data.eventId) {
+      existingUrl = existingEvents[i].resultadosUrl || '';
+      break;
+    }
+  }
+
+  var existingFile = findDriveFileByUrl_(existingUrl);
+  if (existingFile) {
+    try {
+      existingFile.setTrashed(true);
+    } catch (err) {
+      // Si no se puede borrar el JSON anterior, se crea uno nuevo de todas formas.
+    }
+  }
+
+  var created = folder.createFile(jsonBlob);
+  created.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  var resultadosUrl = created.getUrl();
+
+  updateEventResultadosUrl_(ss, data.eventId, resultadosUrl);
+
+  return {
+    success: true,
+    results: results,
+    resultadosUrl: resultadosUrl,
+  };
 }
 
 function getRegistrationsSheet_(ss) {

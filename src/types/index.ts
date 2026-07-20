@@ -70,6 +70,8 @@ export interface Event {
   active: boolean;
   finished: boolean;
   reglamentoUrl: string;
+  /** URL del JSON de resultados en Drive (o "local" en modo sin API). */
+  resultadosUrl: string;
   valorInscripcion: number;
 }
 
@@ -78,6 +80,63 @@ export interface EventSavePayload extends Event {
   reglamentoArchivo?: string;
   reglamentoFileName?: string;
   reglamentoFileType?: string;
+}
+
+export type HeatKey = 'manga1' | 'manga2' | 'manga3' | 'final';
+
+export interface ResultsTable {
+  columns: string[];
+  rows: Array<Record<string, string>>;
+  commentColumn?: string | null;
+  pdfUrl?: string;
+  csvUrl?: string;
+}
+
+export interface CategoryResults {
+  categoryId: string;
+  categoryLabel: string;
+  manga1?: ResultsTable;
+  manga2?: ResultsTable;
+  manga3?: ResultsTable;
+  final?: ResultsTable;
+}
+
+export interface EventResults {
+  eventId: string;
+  updatedAt: string;
+  categories: CategoryResults[];
+}
+
+/** Archivo pendiente de subir a Drive (base64 data URL). */
+export interface ResultsFileUpload {
+  archivo: string;
+  fileName: string;
+  fileType: string;
+}
+
+export interface ResultsHeatSavePayload {
+  columns: string[];
+  rows: Array<Record<string, string>>;
+  commentColumn?: string | null;
+  pdfUrl?: string;
+  csvUrl?: string;
+  pdfUpload?: ResultsFileUpload;
+  csvUpload?: ResultsFileUpload;
+}
+
+export interface CategoryResultsSavePayload {
+  categoryId: string;
+  categoryLabel: string;
+  manga1?: ResultsHeatSavePayload;
+  manga2?: ResultsHeatSavePayload;
+  manga3?: ResultsHeatSavePayload;
+  final?: ResultsHeatSavePayload;
+}
+
+export interface EventResultsSavePayload {
+  eventId: string;
+  eventName: string;
+  categories: CategoryResultsSavePayload[];
 }
 
 export interface Registration {

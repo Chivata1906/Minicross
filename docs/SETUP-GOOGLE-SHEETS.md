@@ -78,8 +78,11 @@ npm run build
 | description | Descripcion |
 | active | Habilitado para inscripciones (true/false) |
 | reglamentoUrl | URL del PDF del reglamento en Drive |
-| finished | Evento finalizado; habilita boton Ver resultados (true/false) |
+| finished | Evento finalizado (true/false) |
 | valorInscripcion | Valor de inscripcion por categoria (COP, numero) |
+| resultadosUrl | URL del JSON de resultados en Drive (carpeta Resultados). Si esta vacio, no se muestra Ver resultados |
+
+Tras actualizar el script, vuelve a **Implementar > Administrar implementaciones > Nueva version** y ejecuta **repairEventsSheet** (o **repairAllSheets**) para agregar la columna `resultadosUrl`.
 
 Si agregaste columnas manualmente, ejecuta **repairEventsSheet** o **repairAllSheets** en Apps Script (deben aparecer en el selector de funciones tras pegar el script actualizado).
 

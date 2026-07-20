@@ -1,5 +1,13 @@
 import { CONFIG } from '../config';
-import type { AppData, Event, EventSavePayload, Registration, RegistrationFormData } from '../types';
+import type {
+  AppData,
+  Event,
+  EventResults,
+  EventResultsSavePayload,
+  EventSavePayload,
+  Registration,
+  RegistrationFormData,
+} from '../types';
 import { calculateCategoryAge, generateId, parseSheetDate } from './age';
 import { getCategoryById, formatCategoryOptionLabel, validateCategorySelection } from '../types';
 import { computeRegistrationTotal } from './registration-total';
@@ -11,6 +19,8 @@ import {
   isApiEnabled,
   allPilotNumbers,
 } from './api';
+
+const LOCAL_RESULTS_MARKER = 'local';
 
 async function fetchJson<T>(url: string): Promise<T | null> {
   try {
@@ -50,8 +60,13 @@ function normalizeEvent(raw: Record<string, unknown>): Event {
     active: parseBoolField(raw.active),
     finished: parseBoolField(raw.finished),
     reglamentoUrl: String(raw.reglamentoUrl ?? ''),
+    resultadosUrl: String(raw.resultadosUrl ?? ''),
     valorInscripcion: Number(raw.valorInscripcion ?? 0) || 0,
   };
+}
+
+export function eventHasResults(event: Event): boolean {
+  return Boolean(event.resultadosUrl?.trim());
 }
 
 function normalizeRegistration(raw: Record<string, unknown>): Registration {
@@ -344,6 +359,87 @@ export function downloadJson(data: unknown, filename: string): void {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function readLocalResultsMap(): Record<string, EventResults> {
+  return readLocal<Record<string, EventResults>>(CONFIG.storageKeys.results) ?? {};
+}
+
+function writeLocalResultsMap(map: Record<string, EventResults>): void {
+  writeLocal(CONFIG.storageKeys.results, map);
+}
+
+function stripUploadsFromResults(payload: EventResultsSavePayload): EventResults {
+  return {
+    eventId: payload.eventId,
+    updatedAt: new Date().toISOString(),
+    categories: payload.categories.map((cat) => {
+      const next: EventResults['categories'][number] = {
+        categoryId: cat.categoryId,
+        categoryLabel: cat.categoryLabel,
+      };
+      for (const heat of ['manga1', 'manga2', 'manga3', 'final'] as const) {
+        const heatData = cat[heat];
+        if (!heatData) continue;
+        next[heat] = {
+          columns: heatData.columns,
+          rows: heatData.rows,
+          commentColumn: heatData.commentColumn ?? null,
+          pdfUrl: heatData.pdfUrl,
+          csvUrl: heatData.csvUrl,
+        };
+      }
+      return next;
+    }),
+  };
+}
+
+export async function loadEventResults(eventId: string): Promise<EventResults | null> {
+  if (isApiEnabled()) {
+    try {
+      const data = await apiGet<{ results: EventResults | null }>({
+        action: 'results',
+        eventId,
+      });
+      return data.results ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  return readLocalResultsMap()[eventId] ?? null;
+}
+
+export async function saveEventResults(
+  payload: EventResultsSavePayload
+): Promise<{ results: EventResults; resultadosUrl: string }> {
+  if (isApiEnabled()) {
+    const data = await apiPost<{
+      success?: boolean;
+      results: EventResults;
+      resultadosUrl: string;
+    }>({
+      action: 'saveResults',
+      data: payload,
+    });
+    return {
+      results: data.results,
+      resultadosUrl: data.resultadosUrl,
+    };
+  }
+
+  const results = stripUploadsFromResults(payload);
+  const map = readLocalResultsMap();
+  map[payload.eventId] = results;
+  writeLocalResultsMap(map);
+
+  const events = await loadEvents();
+  const updated = events.map((e) =>
+    e.id === payload.eventId ? { ...e, resultadosUrl: LOCAL_RESULTS_MARKER } : e
+  );
+  await saveEvents(updated);
+
+  return { results, resultadosUrl: LOCAL_RESULTS_MARKER };
 }
 
 export async function readFileAsDataUrl(file: File): Promise<string> {

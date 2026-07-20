@@ -9,6 +9,7 @@
     "active": true,
     "finished": false,
     "reglamentoUrl": "",
+    "resultadosUrl": "",
     "valorInscripcion": 0
   },
   {
@@ -21,6 +22,7 @@
     "active": true,
     "finished": false,
     "reglamentoUrl": "",
+    "resultadosUrl": "",
     "valorInscripcion": 0
   }
 ]

@@ -20,6 +20,7 @@ import {
 } from '../types';
 import type { Event, EventSavePayload, Registration } from '../types';
 import Swal from 'sweetalert2';
+import { openResultsModal } from './admin-results-modal';
 
 function isAuthenticated(): boolean {
   return sessionStorage.getItem(CONFIG.storageKeys.adminSession) === 'true';
@@ -311,6 +312,8 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
                   Finalizado
                 </label>
                 ${e.reglamentoUrl?.trim() ? '<a href="' + e.reglamentoUrl + '" target="_blank" rel="noopener noreferrer" class="text-secondary text-sm hover:text-accent">Ver convocatoria</a>' : '<span class="text-xs text-gray-light">Sin convocatoria</span>'}
+                <button class="load-results-btn text-secondary text-sm hover:text-accent" data-id="${e.id}">${e.resultadosUrl?.trim() ? 'Editar resultados' : 'Cargar resultados'}</button>
+                ${e.resultadosUrl?.trim() ? '<a href="./resultados.html?evento=' + e.id + '" target="_blank" rel="noopener noreferrer" class="text-secondary text-sm hover:text-accent">Ver resultados</a>' : ''}
                 <button class="edit-event-btn text-secondary text-sm hover:text-accent" data-id="${e.id}">Editar</button>
                 <button class="delete-event-btn text-orange text-sm hover:text-accent" data-id="${e.id}">Eliminar</button>
               </div>`
@@ -336,7 +339,7 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
             </div>
             <label class="flex items-center gap-2 text-sm">
               <input type="checkbox" id="event-finished" class="accent-accent" />
-              Evento finalizado (habilita boton Ver resultados)
+              Evento finalizado
             </label>
             <div class="flex gap-2">
               <button type="submit" class="btn-primary text-sm py-2 px-4">Guardar evento</button>
@@ -543,6 +546,17 @@ function bindAdminEvents(events: Event[], registrations: Registration[]): void {
     });
   });
 
+  document.querySelectorAll('.load-results-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-id')!;
+      const event = events.find((e) => e.id === id);
+      if (!event) return;
+      await openResultsModal(event, async () => {
+        await refreshAdmin();
+      });
+    });
+  });
+
 
   const reglamentoInput = document.getElementById('event-reglamento') as HTMLInputElement | null;
   reglamentoInput?.addEventListener('change', async () => {
@@ -577,6 +591,7 @@ function bindAdminEvents(events: Event[], registrations: Registration[]): void {
       active: existing?.active ?? true,
       finished: (document.getElementById('event-finished') as HTMLInputElement).checked,
       reglamentoUrl: existing?.reglamentoUrl ?? '',
+      resultadosUrl: existing?.resultadosUrl ?? '',
     };
 
     const reglamentoFile = (document.getElementById('event-reglamento') as HTMLInputElement).files?.[0];
