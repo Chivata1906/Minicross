@@ -43,6 +43,87 @@ function getEventIdFromUrl(): string | null {
   return new URLSearchParams(window.location.search).get('evento');
 }
 
+interface PaymentDetails {
+  bank: string;
+  accountType: string;
+  holderLabel: string;
+  holder: string;
+  accountLabel: string;
+  accountNumber: string;
+  keyLabel: string;
+  keyValue: string;
+  extra?: string;
+}
+
+const DEFAULT_PAYMENT: PaymentDetails = {
+  bank: 'BBVA',
+  accountType: 'Ahorros',
+  holderLabel: 'Nombre del producto',
+  holder: 'Ahorro Libretón',
+  accountLabel: 'Número de contrato',
+  accountNumber: '0021357124',
+  keyLabel: 'Llave BBVA',
+  keyValue: '@bbva3146105217',
+};
+
+const YOPAL_PAYMENT: PaymentDetails = {
+  bank: 'Bancolombia S.A.',
+  accountType: 'Ahorros',
+  holderLabel: 'Titular',
+  holder: 'JUAN CAMILO ACOSTA PRIETO',
+  accountLabel: 'Número de cuenta',
+  accountNumber: '62990720873',
+  keyLabel: 'Llave',
+  keyValue: '@acosta5890',
+  extra: 'CC 1013265890',
+};
+
+function isYopalHollywoodEvent(event: Event): boolean {
+  const haystack = `${event.name} ${event.location} ${event.city}`.toLowerCase();
+  return (
+    haystack.includes('hollywood') ||
+    haystack.includes('yopal') ||
+    haystack.includes('casanare')
+  );
+}
+
+function getPaymentDetails(event: Event | undefined): PaymentDetails {
+  if (event && isYopalHollywoodEvent(event)) return YOPAL_PAYMENT;
+  return DEFAULT_PAYMENT;
+}
+
+function renderPaymentDetails(details: PaymentDetails): string {
+  return `
+    <p class="text-sm font-semibold text-secondary uppercase tracking-wide">
+      Datos para realizar el pago
+    </p>
+    <p class="text-xs text-gray-light">
+      Transfiere el total indicado con los siguientes datos y adjunta el comprobante más abajo.
+    </p>
+    <dl class="grid gap-2 sm:grid-cols-2 text-sm">
+      <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5">
+        <dt class="text-xs text-gray-light mb-0.5">Banco</dt>
+        <dd class="font-medium text-white">${details.bank}</dd>
+      </div>
+      <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5">
+        <dt class="text-xs text-gray-light mb-0.5">Tipo de cuenta</dt>
+        <dd class="font-medium text-white">${details.accountType}</dd>
+      </div>
+      <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5 sm:col-span-2">
+        <dt class="text-xs text-gray-light mb-0.5">${details.holderLabel}</dt>
+        <dd class="font-medium text-white">${details.holder}${details.extra ? ` · ${details.extra}` : ''}</dd>
+      </div>
+      <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5 sm:col-span-2">
+        <dt class="text-xs text-gray-light mb-0.5">${details.accountLabel}</dt>
+        <dd class="font-medium text-accent font-mono text-base tracking-wide">${details.accountNumber}</dd>
+      </div>
+      <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5 sm:col-span-2">
+        <dt class="text-xs text-gray-light mb-0.5">${details.keyLabel}</dt>
+        <dd class="font-medium text-accent font-mono text-base tracking-wide">${details.keyValue}</dd>
+      </div>
+    </dl>`;
+}
+
 function renderCategoryCheckboxes(age: number, selected: string[] = []): string {
   const categories = getCategoriesForAge(age);
   if (categories.length === 0) {
@@ -183,31 +264,8 @@ function renderForm(events: Event[], selectedEventId: string | null, pilotNumber
           </p>
         </div>
 
-        <div class="rounded-xl border border-secondary/25 bg-primary/60 p-4 space-y-3">
-          <p class="text-sm font-semibold text-secondary uppercase tracking-wide">
-            Datos para realizar el pago
-          </p>
-          <p class="text-xs text-gray-light">
-            Transfiere el total indicado con los siguientes datos y adjunta el comprobante más abajo.
-          </p>
-          <dl class="grid gap-2 sm:grid-cols-2 text-sm">
-            <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5">
-              <dt class="text-xs text-gray-light mb-0.5">Tipo de cuenta</dt>
-              <dd class="font-medium text-white">Ahorros</dd>
-            </div>
-            <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5">
-              <dt class="text-xs text-gray-light mb-0.5">Nombre del producto</dt>
-              <dd class="font-medium text-white">Ahorro Libretón</dd>
-            </div>
-            <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5 sm:col-span-2">
-              <dt class="text-xs text-gray-light mb-0.5">Número de contrato</dt>
-              <dd class="font-medium text-accent font-mono text-base tracking-wide">0021357124</dd>
-            </div>
-            <div class="rounded-lg border border-secondary/15 bg-primary/40 px-3 py-2.5 sm:col-span-2">
-              <dt class="text-xs text-gray-light mb-0.5">Llave BBVA</dt>
-              <dd class="font-medium text-accent font-mono text-base tracking-wide">@bbva3146105217</dd>
-            </div>
-          </dl>
+        <div id="payment-details" class="rounded-xl border border-secondary/25 bg-primary/60 p-4 space-y-3">
+          ${renderPaymentDetails(DEFAULT_PAYMENT)}
         </div>
       </div>
 
@@ -307,6 +365,11 @@ function updateInscriptionTotal(events: Event[]): void {
   const selectedCount = getSelectedCategoryIds().length;
   const unitPrice = event?.valorInscripcion ?? 0;
   const total = unitPrice * selectedCount;
+
+  const paymentDetailsEl = document.getElementById('payment-details');
+  if (paymentDetailsEl) {
+    paymentDetailsEl.innerHTML = renderPaymentDetails(getPaymentDetails(event));
+  }
 
   if (selectedCount > 0 && event) {
     totalBlock.classList.remove('hidden');
