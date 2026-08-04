@@ -85,6 +85,8 @@ export function initHomePage(): void {
             ['85cc', '9 – 11 años'],
             ['85cc', '11 – 13 años'],
             ['125cc Junior', '12 – 17 años'],
+            ['Iniciación', '15+ años'],
+            ['Pre-expertos', '15+ años'],
           ]
             .map(
               ([cc, age]) => `
