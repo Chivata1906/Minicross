@@ -208,7 +208,7 @@ Todo el código fuente debe estar en **UTF-8** (`.editorconfig`, `.vscode/settin
 | 85cc | 9 – 11 años |
 | 85cc | 11 – 13 años |
 | 125cc Junior | 12 – 17 años |
-| Iniciación | 15+ años |
+| Iniciación | 18+ años |
 | Pre-expertos | 15+ años |
 
 Edad mínima: primer día del evento. Edad máxima: cumplida al 1 de enero del año del campeonato (según reglamento).

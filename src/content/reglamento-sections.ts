@@ -44,7 +44,7 @@ export const REGLAMENTO_SECTIONS: ReglamentoSection[] = [
         ['85cc', '9 a 11 años'],
         ['85cc', '11 a 13 años'],
         ['125cc Junior', '12 a 17 años'],
-        ['Iniciación', '15 años en adelante'],
+        ['Iniciación', '18 años en adelante'],
         ['Pre-expertos', '15 años en adelante'],
       ],
     },
@@ -85,7 +85,7 @@ export const REGLAMENTO_SECTIONS: ReglamentoSection[] = [
       {
         title: 'Iniciación',
         bullets: [
-          'Categoría abierta a pilotos de 15 años en adelante.',
+          'Categoría abierta a pilotos de 18 años en adelante.',
           'La cilindrada y configuración de la motocicleta deberán ser autorizadas por la organización.',
         ],
       },

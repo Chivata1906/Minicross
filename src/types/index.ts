@@ -26,7 +26,7 @@ export const CATEGORIES: Category[] = [
   { id: '85cc-9-11', label: '85cc', minAge: 9, maxAge: 11 },
   { id: '85cc-11-13', label: '85cc', minAge: 11, maxAge: 13 },
   { id: '125cc-junior', label: '125cc Junior', minAge: 12, maxAge: 17 },
-  { id: 'iniciacion', label: 'Iniciación', minAge: 15, maxAge: 99 },
+  { id: 'iniciacion', label: 'Iniciación', minAge: 18, maxAge: 99 },
   { id: 'pre-expertos', label: 'Pre-expertos', minAge: 15, maxAge: 99 },
 ];
 
