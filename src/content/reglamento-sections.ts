@@ -37,7 +37,8 @@ export const REGLAMENTO_SECTIONS: ReglamentoSection[] = [
     table: {
       headers: ['Categoría', 'Edad'],
       rows: [
-        ['50cc', '4 a 6 años'],
+        ['50cc Race', '4 a 6 años'],
+        ['50cc PW', '4 a 6 años'],
         ['50cc', '6 a 8 años'],
         ['65cc', '7 a 9 años'],
         ['65cc', '8 a 10 años'],
@@ -58,7 +59,7 @@ export const REGLAMENTO_SECTIONS: ReglamentoSection[] = [
         bullets: [
           'Motocicletas automáticas de 2 tiempos hasta 50cc.',
           'Permitidas motocicletas eléctricas equivalentes autorizadas por la organización.',
-          'Para la categoría 50cc (4-6 años), las motocicletas deberán conservar configuración original de fábrica, rin 10 delantero y trasero.',
+          'Para las categorías 50cc Race y 50cc PW (4-6 años), las motocicletas deberán conservar configuración original de fábrica, rin 10 delantero y trasero.',
           'Se prohíben modificaciones extremas de motor, chasis o suspensión.',
           'La organización podrá limitar motocicletas que considere excesivamente modificadas para la categoría infantil.',
         ],

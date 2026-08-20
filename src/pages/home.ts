@@ -78,7 +78,8 @@ export function initHomePage(): void {
         <p class="text-center text-gray-light mb-10 max-w-2xl mx-auto">Compite en la categoría que corresponda a tu edad al 1 de enero del año del campeonato.</p>
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           ${[
-            ['50cc', '4 – 6 años'],
+            ['50cc Race', '4 – 6 años'],
+            ['50cc PW', '4 – 6 años'],
             ['50cc', '6 – 8 años'],
             ['65cc', '7 – 9 años'],
             ['65cc', '8 – 10 años'],

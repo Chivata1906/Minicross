@@ -201,7 +201,8 @@ Todo el código fuente debe estar en **UTF-8** (`.editorconfig`, `.vscode/settin
 
 | Categoría | Edad |
 |-----------|------|
-| 50cc | 4 – 6 años |
+| 50cc Race | 4 – 6 años |
+| 50cc PW | 4 – 6 años |
 | 50cc | 6 – 8 años |
 | 65cc | 7 – 9 años |
 | 65cc | 8 – 10 años |

@@ -19,7 +19,8 @@ const LEGACY_CATEGORY_IDS: Record<string, string> = {
 };
 
 export const CATEGORIES: Category[] = [
-  { id: '50cc-4-6', label: '50cc', minAge: 4, maxAge: 6 },
+  { id: '50cc-4-6', label: '50cc Race', minAge: 4, maxAge: 6 },
+  { id: '50cc-pw-4-6', label: '50cc PW', minAge: 4, maxAge: 6 },
   { id: '50cc-6-8', label: '50cc', minAge: 6, maxAge: 8 },
   { id: '65cc-7-9', label: '65cc', minAge: 7, maxAge: 9 },
   { id: '65cc-8-10', label: '65cc', minAge: 8, maxAge: 10 },
