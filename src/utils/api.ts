@@ -24,6 +24,17 @@ export async function apiGet<T>(params: Record<string, string> = {}): Promise<T>
   return data;
 }
 
+export async function verifyAdminAuth(password: string): Promise<boolean> {
+  if (!isApiEnabled()) return true;
+  const res = await fetch(buildUrl({ action: 'registrations', password }));
+  if (!res.ok) throw new Error('No se pudo conectar con el servidor.');
+  const data = (await res.json()) as { success?: boolean; error?: string };
+  if (data.success === false && data.error) {
+    throw new Error(data.error === 'No autorizado' ? 'Contraseña incorrecta.' : data.error);
+  }
+  return true;
+}
+
 export async function apiPost<T>(body: unknown): Promise<T> {
   const password = sessionStorage.getItem('minicross_admin_password');
   let finalBody = body;

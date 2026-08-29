@@ -125,14 +125,10 @@ export async function saveEvents(events: EventSavePayload[]): Promise<void> {
 
 export async function loadRegistrations(): Promise<Registration[]> {
   if (isApiEnabled()) {
-    try {
-      const data = await apiGet<{ registrations: Record<string, unknown>[] }>({
-        action: 'registrations',
-      });
-      return (data.registrations ?? []).map(normalizeRegistration);
-    } catch {
-      /* fallback below */
-    }
+    const data = await apiGet<{ registrations: Record<string, unknown>[] }>({
+      action: 'registrations',
+    });
+    return (data.registrations ?? []).map(normalizeRegistration);
   }
 
   const fromLocal = readLocal<Registration[]>(CONFIG.storageKeys.registrations);

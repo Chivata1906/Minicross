@@ -9,6 +9,7 @@ import {
   deleteRegistration,
   isApiEnabled,
 } from '../utils/storage';
+import { verifyAdminAuth } from '../utils/api';
 import { calculateCategoryAge, formatDate, generateId, parseSheetDate } from '../utils/age';
 import { exportRegistrations, type ExportFormat } from '../utils/export-registrations';
 import { formatCop, resolveRegistrationTotal } from '../utils/registration-total';
@@ -375,6 +376,13 @@ async function refreshAdmin(showLoading = false): Promise<void> {
     bindAdminEvents(events, registrations);
   } catch (err) {
     Swal.close();
+    if (err instanceof Error && err.message.includes('No autorizado')) {
+      sessionStorage.removeItem('minicross_admin_password');
+      sessionStorage.removeItem(CONFIG.storageKeys.adminSession);
+      await showError('Sesion no autorizada', 'La contrasena no es valida o ha cambiado.');
+      initAdminPage();
+      return;
+    }
     await showError(
       'Error al cargar',
       err instanceof Error ? err.message : 'No se pudieron obtener los datos del panel.'
@@ -405,6 +413,7 @@ async function promptExportFormat(): Promise<ExportFormat | null> {
 function bindAdminEvents(events: Event[], registrations: Registration[]): void {
   document.getElementById('logout-btn')?.addEventListener('click', () => {
     sessionStorage.removeItem(CONFIG.storageKeys.adminSession);
+    sessionStorage.removeItem('minicross_admin_password');
     initAdminPage();
   });
 
@@ -723,11 +732,10 @@ export async function initAdminPage(): Promise<void> {
       const password = (document.getElementById('password') as HTMLInputElement).value;
       const errorEl = document.getElementById('login-error');
 
-      sessionStorage.setItem('minicross_admin_password', password);
-
       try {
         showSaving('Verificando credenciales...');
-        await loadRegistrations();
+        await verifyAdminAuth(password);
+        sessionStorage.setItem('minicross_admin_password', password);
         sessionStorage.setItem(CONFIG.storageKeys.adminSession, 'true');
         Swal.close();
         initAdminPage();
@@ -736,7 +744,7 @@ export async function initAdminPage(): Promise<void> {
         sessionStorage.removeItem(CONFIG.storageKeys.adminSession);
         Swal.close();
         if (errorEl) {
-          errorEl.textContent = 'Contrasena incorrecta o error de conexion.';
+          errorEl.textContent = err instanceof Error ? err.message : 'Contraseña incorrecta o error de conexion.';
           errorEl.classList.remove('hidden');
         }
       }
