@@ -6,6 +6,7 @@ import {
   loadEvents,
   getAvailablePilotNumbers,
   readFileAsDataUrl,
+  initCategories,
 } from '../utils/storage';
 import { calculateCategoryAge, formatDate } from '../utils/age';
 import { getCategoriesForAge, formatCategoryOptionLabel, type Event } from '../types';
@@ -628,7 +629,11 @@ export async function initRegistrationPage(): Promise<void> {
   if (!card) return;
 
   try {
-    const events = (await loadEvents()).filter((e) => e.active);
+    const [allEvents] = await Promise.all([
+      loadEvents(),
+      initCategories().catch(() => undefined),
+    ]);
+    const events = allEvents.filter((e) => e.active);
     const eventIdFromUrl = getEventIdFromUrl();
     const initialEventId =
       eventIdFromUrl && events.some((e) => e.id === eventIdFromUrl)

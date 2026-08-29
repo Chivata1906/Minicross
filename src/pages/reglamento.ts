@@ -4,6 +4,25 @@ import {
   REGLAMENTO_SECTIONS,
   type ReglamentoSection,
 } from '../content/reglamento-sections';
+import { getEnabledCategories } from '../types';
+import { initCategories } from '../utils/storage';
+
+function formatCategoryAgeRow(minAge: number, maxAge: number): string {
+  if (maxAge >= 99) {
+    return `${minAge} años en adelante`;
+  }
+  return `${minAge} a ${maxAge} años`;
+}
+
+/** Reconstruye la tabla de categorías oficiales con lo configurado en el panel. */
+function buildReglamentoSections(): ReglamentoSection[] {
+  const categories = getEnabledCategories();
+  return REGLAMENTO_SECTIONS.map((section) => {
+    if (section.id !== 'categorias' || !section.table) return section;
+    const rows = categories.map((c) => [c.label, formatCategoryAgeRow(c.minAge, c.maxAge)]);
+    return { ...section, table: { ...section.table, rows } };
+  });
+}
 
 function escapeHtml(text: string): string {
   return text
@@ -101,11 +120,18 @@ function renderToc(): string {
   ).join('');
 }
 
-export function initReglamentoPage(): void {
+export async function initReglamentoPage(): Promise<void> {
   const app = document.getElementById('app');
   if (!app) return;
 
-  const sectionsHtml = REGLAMENTO_SECTIONS.map(renderSection).join('');
+  try {
+    await initCategories();
+  } catch {
+    /* se usan las categorías por defecto */
+  }
+
+  const sections = buildReglamentoSections();
+  const sectionsHtml = sections.map(renderSection).join('');
 
   app.innerHTML = `
     ${renderNavbar('reglamento')}

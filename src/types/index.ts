@@ -6,6 +6,11 @@ export interface Category {
   label: string;
   minAge: number;
   maxAge: number;
+  /**
+   * false = inhabilitada para nuevas inscripciones / eventos futuros.
+   * Si se omite se considera habilitada. No se elimina si ya hay inscritos.
+   */
+  active?: boolean;
 }
 
 /** IDs legacy (A/B) → IDs actuales por rango de edad. */
@@ -30,6 +35,36 @@ export const CATEGORIES: Category[] = [
   { id: 'iniciacion', label: 'Iniciación', minAge: 18, maxAge: 99 },
   { id: 'pre-expertos', label: 'Pre-expertos', minAge: 15, maxAge: 99 },
 ];
+
+/**
+ * Store mutable de categorías. Arranca con las listas por defecto del código
+ * y puede ser reemplazado con lo configurado desde el panel de gestión
+ * (Google Sheets / localStorage) vía setCategoryStore.
+ */
+let categoryStore: Category[] = [...CATEGORIES];
+
+/**
+ * Reemplaza las categorías configuradas.
+ * Si la lista está vacía, se mantienen las actuales / por defecto.
+ */
+export function setCategoryStore(categories: Category[]): void {
+  if (categories && categories.length > 0) {
+    categoryStore = categories.map((c) => ({ ...c }));
+  }
+}
+
+export function getCategories(): Category[] {
+  return categoryStore;
+}
+
+export function isCategoryEnabled(category: Category): boolean {
+  return category.active !== false;
+}
+
+/** Categorías habilitadas (aparecen en home, reglamento e inscripciones nuevas). */
+export function getEnabledCategories(): Category[] {
+  return categoryStore.filter(isCategoryEnabled);
+}
 
 export function resolveCategoryId(id: string): string {
   return LEGACY_CATEGORY_IDS[id] ?? id;
@@ -58,12 +93,27 @@ export function formatCategoryDisplayLabel(categoriaId: string, fallbackLabel = 
 
 export function getCategoryById(id: string): Category | undefined {
   const resolved = resolveCategoryId(id);
-  return CATEGORIES.find((c) => c.id === resolved);
+  return (
+    categoryStore.find((c) => c.id === resolved) ??
+    CATEGORIES.find((c) => c.id === resolved)
+  );
 }
 
-export function getCategoriesForAge(age: number): Category[] {
+/**
+ * Categorías elegibles por edad.
+ * Por defecto solo habilita las activas; `includeIds` permite mostrar
+ * categorías inhabilitadas ya seleccionadas (edición de inscripciones).
+ */
+export function getCategoriesForAge(
+  age: number,
+  options?: { includeIds?: string[] }
+): Category[] {
   if (age < 0) return [];
-  return CATEGORIES.filter((c) => age >= c.minAge && age <= c.maxAge);
+  const include = new Set((options?.includeIds ?? []).map(resolveCategoryId));
+  return categoryStore.filter((c) => {
+    if (age < c.minAge || age > c.maxAge) return false;
+    return isCategoryEnabled(c) || include.has(c.id);
+  });
 }
 
 export interface Event {

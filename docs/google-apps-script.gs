@@ -11,6 +11,7 @@ const SPREADSHEET_ID = '1g5crmfmbcxyvmLMXxYECxO90gFYiXf7P5JaSze7pmbI';
 const DRIVE_FOLDER_ID = '1oImoS0x__kgBBXaL9HAg3Qf-4Zj0Xz0l';
 
 const EVENT_HEADERS = ['id', 'name', 'date', 'location', 'city', 'description', 'active', 'reglamentoUrl', 'finished', 'valorInscripcion', 'resultadosUrl'];
+const CATEGORY_HEADERS = ['id', 'label', 'minAge', 'maxAge', 'active'];
 const REG_HEADERS = [
   'id', 'eventId', 'eventName', 'nombre', 'apellido', 'identificacion',
   'identificacionArchivo', 'identificacionFileName', 'identificacionFileType',
@@ -53,6 +54,10 @@ function doGet(e) {
     return jsonResponse({ results: getEventResults_(ss, eventId) });
   }
 
+  if (action === 'categories') {
+    return jsonResponse({ categories: getCategories_(ss) });
+  }
+
   // Acciones Protegidas (GET) - Requieren contraseña
   if (action === 'registrations') {
     if (password !== ADMIN_PASSWORD) {
@@ -66,10 +71,14 @@ function doGet(e) {
       return jsonResponse({
         events: getEvents_(ss),
         registrations: getRegistrations_(ss),
+        categories: getCategories_(ss),
       });
     }
-    // Si no está autorizado para ver todo, solo devolvemos los eventos
-    return jsonResponse({ events: getEvents_(ss) });
+    // Si no está autorizado para ver todo, solo devolvemos los eventos y categorías públicas
+    return jsonResponse({
+      events: getEvents_(ss),
+      categories: getCategories_(ss),
+    });
   }
 
   return jsonResponse({ success: false, error: 'Accion desconocida o requiere autorizacion' });
@@ -97,7 +106,8 @@ function doPost(e) {
     'deleteRegistration',
     'saveEvents',
     'saveResults',
-    'saveRegistrations'
+    'saveRegistrations',
+    'saveCategories'
   ];
 
   if (adminActions.indexOf(body.action) !== -1) {
@@ -123,6 +133,13 @@ function doPost(e) {
     case 'saveRegistrations':
       try {
         writeRegistrations_(ss, body.registrations);
+        return jsonResponse({ success: true });
+      } catch (err) {
+        return jsonResponse({ success: false, error: err.message || String(err) });
+      }
+    case 'saveCategories':
+      try {
+        writeCategories_(ss, body.categories);
         return jsonResponse({ success: true });
       } catch (err) {
         return jsonResponse({ success: false, error: err.message || String(err) });
@@ -415,6 +432,52 @@ function getRegistrations_(ss) {
   var sheet = getRegistrationsSheet_(ss);
   if (!sheet || sheet.getLastRow() < 2) return [];
   return sheetToObjects_(sheet);
+}
+
+// ─── Categorías (gestionadas desde el panel) ────────────────────────────────
+
+function getCategoriesSheet_(ss) {
+  return getOrCreateSheet_(ss, 'Categories', CATEGORY_HEADERS);
+}
+
+function normalizeCategoryRow_(row) {
+  var maxAge = Number(row.maxAge);
+  var minAge = Number(row.minAge);
+  var activeRaw = row.active;
+  var active =
+    activeRaw === undefined || activeRaw === null || activeRaw === ''
+      ? true
+      : activeRaw === true ||
+        activeRaw === 'TRUE' ||
+        activeRaw === 'true' ||
+        activeRaw === 1 ||
+        activeRaw === '1';
+  return {
+    id: String(row.id || '').trim(),
+    label: String(row.label || '').trim(),
+    minAge: isFinite(minAge) && minAge >= 0 ? minAge : 0,
+    maxAge: isFinite(maxAge) && maxAge > 0 ? maxAge : 999,
+    active: active,
+  };
+}
+
+function getCategories_(ss) {
+  var sheet = getCategoriesSheet_(ss);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  return sheetToObjects_(sheet)
+    .map(normalizeCategoryRow_)
+    .filter(function (c) { return c.id && c.label; });
+}
+
+function writeCategories_(ss, categories) {
+  var rows = (categories || [])
+    .map(normalizeCategoryRow_)
+    .filter(function (c) { return c.id && c.label; });
+  if (rows.length === 0) {
+    throw new Error('saveCategories bloqueado: se recibio una lista vacia.');
+  }
+  var sheet = getCategoriesSheet_(ss);
+  writeObjects_(sheet, CATEGORY_HEADERS, rows);
 }
 
 function writeEvents_(ss, events) {
@@ -978,6 +1041,7 @@ function setupSheets() {
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   getEventsSheet_(ss);
   getRegistrationsSheet_(ss);
+  getCategoriesSheet_(ss);
 
   var eventsSheet = ss.getSheetByName('Events');
   if (eventsSheet.getLastRow() === 1) {

@@ -98,7 +98,17 @@ Tras actualizar el script, vuelve a **Implementar > Administrar implementaciones
 
 Si agregaste columnas manualmente, ejecuta **repairEventsSheet** o **repairAllSheets** en Apps Script **solo si** las columnas estan cruzadas/desordenadas (esas si crean backup y reescriben).
 
-> **Importante:** Las funciones `repair*` crean una **copia de seguridad** de la hoja (`BACKUP_Registrations_...`) antes de remapear columnas. El uso normal del sitio **solo agrega columnas nuevas** al final y **no borra inscripciones**. Ejecuta `repair*` solo si las columnas estan cruzadas/desordenadas.
+## Estructura de la hoja Categories
+
+Las categorías se gestionan directamente desde el panel de administración (sección "Categorías del campeonato") y se guardan en la pestaña `Categories`. Si la hoja está vacía, el sistema utiliza las categorías por defecto del código.
+
+| Columna | Descripción |
+|---|---|
+| id | Identificador único y estable de la categoría |
+| label | Nombre visible (ej: `50cc Race`) |
+| minAge | Edad mínima (número) |
+| maxAge | Edad máxima (número; 999 = sin límite) |
+| active | `true` / `false`. Si es `false`, la categoría queda inhabilitada para nuevas inscripciones (no se borra si ya hay inscritos) |
 
 ## Estructura de la hoja Registrations
 

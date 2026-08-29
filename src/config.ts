@@ -20,6 +20,7 @@ export const CONFIG = {
     events: 'minicross_events_v1',
     results: 'minicross_results_v1',
     adminSession: 'minicross_admin_session',
+    categories: 'minicross_categories_v1',
   },
   maxFileSizeMB: 5,
 };

@@ -1,9 +1,27 @@
 import { renderFooter } from '../components/footer';
 import { renderNavbar, initNavbar } from '../components/navbar';
+import { getEnabledCategories } from '../types';
+import { initCategories } from '../utils/storage';
 
-export function initHomePage(): void {
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+export async function initHomePage(): Promise<void> {
   const app = document.getElementById('app');
   if (!app) return;
+
+  try {
+    await initCategories();
+  } catch {
+    /* se usan las categorías por defecto */
+  }
+
+  const enabledCategories = getEnabledCategories();
 
   app.innerHTML = `
     ${renderNavbar('home')}
@@ -77,23 +95,14 @@ export function initHomePage(): void {
         <h2 class="section-title text-center mb-4">Categorías 2026</h2>
         <p class="text-center text-gray-light mb-10 max-w-2xl mx-auto">Compite en la categoría que corresponda a tu edad al 1 de enero del año del campeonato.</p>
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          ${[
-            ['50cc Race', '4 – 6 años'],
-            ['50cc PW', '4 – 6 años'],
-            ['50cc', '6 – 8 años'],
-            ['65cc', '7 – 9 años'],
-            ['65cc', '8 – 10 años'],
-            ['85cc', '9 – 11 años'],
-            ['85cc', '11 – 13 años'],
-            ['125cc Junior', '12 – 17 años'],
-            ['Iniciación', '18+ años'],
-            ['Pre-expertos', '15+ años'],
-          ]
+          ${enabledCategories
             .map(
-              ([cc, age]) => `
-            <div class="card flex items-center gap-4">
-              <span class="font-title text-3xl text-secondary">${cc}</span>
-              <span class="text-gray-light font-medium">${age}</span>
+              (c) => `
+            <div class="card flex items-center justify-between gap-3">
+              <span class="font-title text-xl text-secondary">${escapeHtml(c.label)}</span>
+              <span class="text-gray-light font-medium text-xs whitespace-nowrap">${
+                c.maxAge >= 99 ? `${c.minAge}+ años` : `${c.minAge} – ${c.maxAge} años`
+              }</span>
             </div>`
             )
             .join('')}

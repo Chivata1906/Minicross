@@ -8,6 +8,8 @@ import {
   updateRegistration,
   deleteRegistration,
   isApiEnabled,
+  initCategories,
+  saveStoredCategories,
 } from '../utils/storage';
 import { verifyAdminAuth } from '../utils/api';
 import { calculateCategoryAge, formatDate, generateId, parseSheetDate } from '../utils/age';
@@ -16,10 +18,13 @@ import { formatCop, resolveRegistrationTotal } from '../utils/registration-total
 import {
   formatCategoryDisplayLabel,
   formatCategoryOptionLabel,
+  getCategories,
   getCategoriesForAge,
   getCategoryById,
+  isCategoryEnabled,
+  resolveCategoryId,
 } from '../types';
-import type { Event, EventSavePayload, Registration } from '../types';
+import type { Category, Event, EventSavePayload, Registration } from '../types';
 import Swal from 'sweetalert2';
 import { openResultsModal } from './admin-results-modal';
 
@@ -110,8 +115,18 @@ function parseCategoryIds(value: string): string[] {
     .filter(Boolean);
 }
 
+function getUsedCategoryIds(registrations: Registration[]): Set<string> {
+  const used = new Set<string>();
+  for (const reg of registrations) {
+    for (const id of parseCategoryIds(reg.categoriaId)) {
+      used.add(resolveCategoryId(id));
+    }
+  }
+  return used;
+}
+
 function renderCategoryCheckboxes(age: number, selected: string[] = []): string {
-  const categories = getCategoriesForAge(age);
+  const categories = getCategoriesForAge(age, { includeIds: selected });
   if (categories.length === 0) {
     return '<p class="text-sm text-gray-light">Sin categorias disponibles para esta edad.</p>';
   }
@@ -121,11 +136,253 @@ function renderCategoryCheckboxes(age: number, selected: string[] = []): string 
         (c) => `
       <label class="flex items-center gap-3 rounded-lg border border-secondary/20 bg-primary/40 px-3 py-2 cursor-pointer hover:border-secondary/50">
         <input type="checkbox" name="categoriaIds" value="${c.id}" class="accent-secondary h-4 w-4" ${selected.includes(c.id) ? 'checked' : ''} />
-        <span class="text-sm font-medium">${formatCategoryOptionLabel(c)}</span>
+        <span class="text-sm font-medium">${formatCategoryOptionLabel(c)}${
+          isCategoryEnabled(c) ? '' : ' <span class="text-xs text-orange font-semibold">(inhabilitada)</span>'
+        }</span>
       </label>`
       )
       .join('')}
   </div>`;
+}
+
+// ─── Gestión de categorías del campeonato ───────────────────────────────────
+
+function escapeAttr(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function slugifyCategoryId(label: string): string {
+  const base = label
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+  return base || 'categoria';
+}
+
+function setCategoryRowActiveState(row: HTMLElement, enabled: boolean): void {
+  row.setAttribute('data-cat-active', enabled ? 'true' : 'false');
+  row.classList.toggle('opacity-60', !enabled);
+  row.classList.toggle('border-secondary/10', !enabled);
+  const badge = row.querySelector<HTMLElement>('.cat-status-badge');
+  if (badge) {
+    badge.textContent = enabled ? 'Habilitada' : 'Inhabilitada';
+    badge.className = `cat-status-badge inline-block rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+      enabled
+        ? 'bg-secondary/20 text-secondary border border-secondary/30'
+        : 'bg-orange/20 text-orange border border-orange/30'
+    }`;
+  }
+  const toggleBtn = row.querySelector<HTMLElement>('.cat-toggle-active');
+  if (toggleBtn) {
+    toggleBtn.textContent = enabled ? 'Inhabilitar' : 'Habilitar';
+    toggleBtn.className = `cat-toggle-active text-sm shrink-0 ${
+      enabled ? 'text-gray-light hover:text-orange' : 'text-secondary hover:text-accent'
+    }`;
+  }
+}
+
+function renderCategoryAdminRow(cat?: Category, used = false): string {
+  const maxVal = cat && cat.maxAge < 999 ? String(cat.maxAge) : '';
+  const enabled = cat ? isCategoryEnabled(cat) : true;
+  const id = cat?.id ?? '';
+  const statusBadge = enabled
+    ? '<span class="cat-status-badge inline-block rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-secondary/20 text-secondary border border-secondary/30">Habilitada</span>'
+    : '<span class="cat-status-badge inline-block rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-orange/20 text-orange border border-orange/30">Inhabilitada</span>';
+
+  const actions = used
+    ? `<button type="button" class="cat-toggle-active text-sm shrink-0 ${
+        enabled ? 'text-gray-light hover:text-orange' : 'text-secondary hover:text-accent'
+      }">${enabled ? 'Inhabilitar' : 'Habilitar'}</button>
+       <span class="text-[10px] text-gray-light shrink-0 max-w-[9rem] leading-tight">En uso por inscritos — no se puede eliminar</span>`
+    : `<button type="button" class="cat-delete text-orange text-sm hover:text-accent shrink-0">Eliminar</button>`;
+
+  return `
+    <div class="cat-admin-row flex flex-wrap items-center gap-3 rounded-lg border border-secondary/20 bg-primary/40 p-3 ${
+      enabled ? '' : 'opacity-60 border-secondary/10'
+    }" data-cat-id="${id}" data-cat-active="${enabled ? 'true' : 'false'}" data-cat-used="${used ? 'true' : 'false'}">
+      <div class="flex flex-col gap-1 flex-1 min-w-[240px]">
+        <div class="flex items-center gap-2 flex-wrap">${statusBadge}${
+          used ? '<span class="text-[10px] text-accent font-semibold uppercase tracking-wider">Con inscritos</span>' : ''
+        }</div>
+        <input type="text" class="cat-label input-field text-sm" value="${cat ? escapeAttr(cat.label) : ''}"
+               placeholder="Nombre de la categoría (ej: 50cc Race)" />
+      </div>
+      <label class="flex items-center gap-2 text-xs text-gray-light">
+        Edad
+        <input type="number" class="cat-min input-field text-sm w-20 py-2" min="0" max="120" value="${cat?.minAge ?? ''}" placeholder="mín" required />
+        a
+        <input type="number" class="cat-max input-field text-sm w-20 py-2" min="0" max="120" value="${maxVal}" placeholder="Sin lím." />
+      </label>
+      <div class="flex flex-col items-end gap-1">${actions}</div>
+    </div>`;
+}
+
+function renderCategoriesAdminSection(usedIds: Set<string>): string {
+  const categories = getCategories();
+  const enabledCount = categories.filter(isCategoryEnabled).length;
+
+  return `
+    <section class="card" id="categories-admin">
+      <div class="flex flex-wrap items-center justify-between gap-4 mb-2">
+        <div>
+          <h2 class="font-title text-2xl text-secondary">Categorías del campeonato (${enabledCount}/${categories.length} habilitadas)</h2>
+          <p class="text-sm text-gray-light mt-1">
+            Edita el nombre y el rango de edad, o agrega nuevas categorías. Deja la edad máxima vacía para "sin límite".
+            Si una categoría ya tiene pilotos inscritos no se puede eliminar: inhabilítala para que no aparezca en eventos futuros.
+          </p>
+        </div>
+      </div>
+      <div class="space-y-2 mt-4" id="categories-list">
+        ${categories
+          .map((c) => renderCategoryAdminRow(c, usedIds.has(c.id)))
+          .join('')}
+      </div>
+      <div class="flex flex-wrap gap-2 mt-4">
+        <button type="button" id="add-category-btn" class="btn-outline text-sm py-2 px-4">+ Agregar categoría</button>
+        <button type="button" id="save-categories-btn" class="btn-primary text-sm py-2 px-4">Guardar categorías</button>
+      </div>
+    </section>`;
+}
+
+function collectCategoryRows(usedIds: Set<string>): { categories: Category[]; error: string | null } {
+  const rows = Array.from(document.querySelectorAll<HTMLElement>('.cat-admin-row'));
+  const categories: Category[] = [];
+  const collectedIds = new Set<string>();
+
+  for (const row of rows) {
+    const label = row.querySelector<HTMLInputElement>('.cat-label')?.value.trim() || '';
+    if (!label) return { categories: [], error: 'Todas las categorías deben tener un nombre.' };
+
+    const minRaw = row.querySelector<HTMLInputElement>('.cat-min')?.value.trim() || '';
+    const maxRaw = row.querySelector<HTMLInputElement>('.cat-max')?.value.trim() || '';
+    const active = row.getAttribute('data-cat-active') !== 'false';
+
+    const minAge = Number(minRaw);
+    if (minRaw === '' || !Number.isFinite(minAge) || minAge < 0) {
+      return { categories: [], error: `Edad mínima inválida en "${label}".` };
+    }
+    const maxAge = maxRaw === '' ? 999 : Number(maxRaw);
+    if (!Number.isFinite(maxAge) || maxAge < minAge) {
+      return { categories: [], error: `Edad máxima inválida en "${label}" (debe ser mayor o igual a la mínima).` };
+    }
+
+    let id = row.getAttribute('data-cat-id') || '';
+    if (!id) {
+      const base = slugifyCategoryId(label);
+      id = base;
+      let n = 2;
+      while (collectedIds.has(id) || getCategoryById(id)) id = `${base}-${n++}`;
+    }
+    if (collectedIds.has(id)) return { categories: [], error: `Categoría duplicada: "${label}".` };
+    collectedIds.add(id);
+
+    categories.push({ id, label, minAge, maxAge, active });
+  }
+
+  if (categories.length === 0) {
+    return { categories: [], error: 'Debe existir al menos una categoría.' };
+  }
+  if (!categories.some(isCategoryEnabled)) {
+    return { categories: [], error: 'Debe haber al menos una categoría habilitada.' };
+  }
+
+  for (const existing of getCategories()) {
+    if (usedIds.has(existing.id) && !collectedIds.has(existing.id)) {
+      return {
+        categories: [],
+        error: `No se puede eliminar "${existing.label}": hay pilotos inscritos. Inhabilítala en su lugar.`,
+      };
+    }
+  }
+
+  return { categories, error: null };
+}
+
+function bindCategoriesAdmin(usedIds: Set<string>): void {
+  const section = document.getElementById('categories-admin');
+  if (!section) return;
+
+  section.addEventListener('click', async (e) => {
+    const target = e.target as HTMLElement;
+
+    const toggleBtn = target.closest<HTMLElement>('.cat-toggle-active');
+    if (toggleBtn) {
+      const row = toggleBtn.closest<HTMLElement>('.cat-admin-row');
+      if (!row) return;
+      const currentlyEnabled = row.getAttribute('data-cat-active') !== 'false';
+      const label =
+        row.querySelector<HTMLInputElement>('.cat-label')?.value.trim() || 'esta categoría';
+      if (currentlyEnabled) {
+        const confirmed = await confirmAction(
+          'Inhabilitar categoría',
+          `"${label}" dejará de aparecer en nuevas inscripciones, pero se conservará para los pilotos ya inscritos. Debes pulsar "Guardar categorías" para confirmar.`
+        );
+        if (confirmed) setCategoryRowActiveState(row, false);
+      } else {
+        setCategoryRowActiveState(row, true);
+      }
+      return;
+    }
+
+    if (target.closest('.cat-delete')) {
+      const row = target.closest<HTMLElement>('.cat-admin-row');
+      if (!row) return;
+      const catId = row.getAttribute('data-cat-id') || '';
+      const label =
+        row.querySelector<HTMLInputElement>('.cat-label')?.value.trim() || 'esta categoría';
+
+      if (catId && usedIds.has(catId)) {
+        const result = await Swal.fire({
+          icon: 'warning',
+          title: 'No se puede eliminar',
+          text: `Hay pilotos inscritos en "${label}". Puedes inhabilitarla para que no aparezca en eventos futuros.`,
+          showCancelButton: true,
+          confirmButtonText: 'Inhabilitar',
+          cancelButtonText: 'Cancelar',
+          confirmButtonColor: '#f97316',
+        });
+        if (result.isConfirmed) setCategoryRowActiveState(row, false);
+        return;
+      }
+
+      const confirmed = await confirmAction(
+        'Eliminar categoría',
+        `¿Quitar "${label}" de la lista? Debes pulsar "Guardar categorías" para confirmar el cambio.`
+      );
+      if (confirmed) row.remove();
+      return;
+    }
+  });
+
+  document.getElementById('add-category-btn')?.addEventListener('click', () => {
+    const list = document.getElementById('categories-list');
+    list?.insertAdjacentHTML('beforeend', renderCategoryAdminRow());
+    (list?.lastElementChild?.querySelector('.cat-label') as HTMLInputElement | null)?.focus();
+  });
+
+  document.getElementById('save-categories-btn')?.addEventListener('click', async () => {
+    const { categories, error } = collectCategoryRows(usedIds);
+    if (error) {
+      await showError('Categorías', error);
+      return;
+    }
+
+    showSaving('Guardando categorías...');
+    const cloud = await saveStoredCategories(categories);
+    Swal.close();
+    if (cloud) {
+      await showSuccess('Categorías guardadas', 'Los cambios se sincronizaron con Google Sheets.');
+    } else {
+      await showSuccess(
+        'Categorías guardadas localmente',
+        'No se pudo sincronizar con Google Sheets (verifica que el Apps Script esté actualizado). Los cambios aplican en este navegador.'
+      );
+    }
+    await refreshAdmin();
+  });
 }
 
 function refreshEditFormCategories(form: HTMLFormElement): void {
@@ -209,6 +466,7 @@ function renderRegistrationRow(reg: Registration, events: Event[]): string {
 }
 
 function renderAdminPanel(events: Event[], registrations: Registration[]): string {
+  const usedCategoryIds = getUsedCategoryIds(registrations);
   const activeEvents = events.filter((e) => e.active);
 
   const eventTabs = events
@@ -352,6 +610,8 @@ function renderAdminPanel(events: Event[], registrations: Registration[]): strin
           </form>
         </section>
 
+        ${renderCategoriesAdminSection(usedCategoryIds)}
+
         <section class="card">
           <h2 class="font-title text-2xl text-secondary mb-4">Inscripciones por evento</h2>
           <div class="flex flex-wrap gap-2 mb-6">${eventTabs}</div>
@@ -371,7 +631,11 @@ async function refreshAdmin(showLoading = false): Promise<void> {
   }
 
   try {
-    const [events, registrations] = await Promise.all([loadEvents(), loadRegistrations()]);
+    const [events, registrations] = await Promise.all([
+      loadEvents(),
+      loadRegistrations(),
+      initCategories().catch(() => undefined),
+    ]);
     app.innerHTML = renderAdminPanel(events, registrations);
     bindAdminEvents(events, registrations);
   } catch (err) {
@@ -416,6 +680,8 @@ function bindAdminEvents(events: Event[], registrations: Registration[]): void {
     sessionStorage.removeItem('minicross_admin_password');
     initAdminPage();
   });
+
+  bindCategoriesAdmin(getUsedCategoryIds(registrations));
 
   const panels = document.querySelectorAll('.event-panel');
   const tabs = document.querySelectorAll('.event-tab');
@@ -679,7 +945,8 @@ function bindAdminEvents(events: Event[], registrations: Registration[]): void {
       const fechaNacimiento = parseSheetDate(fd.get('fechaNacimiento') as string);
       const categoriaIds = fd.getAll('categoriaIds').map(String);
       const validCategories = getCategoriesForAge(
-        calculateCategoryAge(fechaNacimiento, CONFIG.championshipYear)
+        calculateCategoryAge(fechaNacimiento, CONFIG.championshipYear),
+        { includeIds: categoriaIds }
       );
 
       if (!fechaNacimiento) {
