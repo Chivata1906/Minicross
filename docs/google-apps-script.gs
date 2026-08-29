@@ -20,14 +20,17 @@ const REG_HEADERS = [
 ];
 const HEAT_KEYS = ['manga1', 'manga2', 'manga3', 'final'];
 
+const ADMIN_PASSWORD = PropertiesService.getScriptProperties().getProperty('ADMIN_PASSWORD');
+
 // ─── HTTP handlers ───────────────────────────────────────────────────────────
 
 function doGet(e) {
   e = e || { parameter: {} };
-  const action = (e.parameter.action || 'all').toString();
+  const action = (e.parameter.action || '').toString();
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const password = (e.parameter.password || '').toString();
 
-  
+  // Acciones Públicas (GET)
   if (action === 'availablePilots') {
     const eventId = e.parameter.eventId;
     return jsonResponse({ numbers: getAvailablePilotNumbers_(ss, eventId) });
@@ -45,19 +48,31 @@ function doGet(e) {
     return jsonResponse({ events: getEvents_(ss) });
   }
 
-  if (action === 'registrations') {
-    return jsonResponse({ registrations: getRegistrations_(ss) });
-  }
-
   if (action === 'results') {
     const eventId = (e.parameter.eventId || '').toString();
     return jsonResponse({ results: getEventResults_(ss, eventId) });
   }
 
-  return jsonResponse({
-    events: getEvents_(ss),
-    registrations: getRegistrations_(ss),
-  });
+  // Acciones Protegidas (GET) - Requieren contraseña
+  if (action === 'registrations') {
+    if (password !== ADMIN_PASSWORD) {
+      return jsonResponse({ success: false, error: 'No autorizado' });
+    }
+    return jsonResponse({ registrations: getRegistrations_(ss) });
+  }
+
+  if (action === 'all') {
+    if (password === ADMIN_PASSWORD) {
+      return jsonResponse({
+        events: getEvents_(ss),
+        registrations: getRegistrations_(ss),
+      });
+    }
+    // Si no está autorizado para ver todo, solo devolvemos los eventos
+    return jsonResponse({ events: getEvents_(ss) });
+  }
+
+  return jsonResponse({ success: false, error: 'Accion desconocida o requiere autorizacion' });
 }
 
 function doPost(e) {
@@ -69,10 +84,29 @@ function doPost(e) {
   }
   const body = JSON.parse(e.postData.contents);
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const password = body.password || '';
+
+  // Acciones Públicas (POST)
+  if (body.action === 'createRegistration') {
+    return jsonResponse(createRegistration_(ss, body.data));
+  }
+
+  // Acciones Protegidas (POST) - Requieren contraseña
+  const adminActions = [
+    'updateRegistration',
+    'deleteRegistration',
+    'saveEvents',
+    'saveResults',
+    'saveRegistrations'
+  ];
+
+  if (adminActions.indexOf(body.action) !== -1) {
+    if (password !== ADMIN_PASSWORD) {
+      return jsonResponse({ success: false, error: 'No autorizado' });
+    }
+  }
 
   switch (body.action) {
-    case 'createRegistration':
-      return jsonResponse(createRegistration_(ss, body.data));
     case 'updateRegistration':
       return jsonResponse(updateRegistration_(ss, body.id, body.data));
     case 'deleteRegistration':
@@ -94,9 +128,10 @@ function doPost(e) {
         return jsonResponse({ success: false, error: err.message || String(err) });
       }
     default:
-      return jsonResponse({ success: false, error: 'Accion desconocida' });
+      return jsonResponse({ success: false, error: 'Accion desconocida o requiere autorizacion' });
   }
 }
+
 
 // ─── Registrations CRUD ──────────────────────────────────────────────────────
 

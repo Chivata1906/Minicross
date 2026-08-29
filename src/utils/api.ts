@@ -12,16 +12,28 @@ function buildUrl(params: Record<string, string>): string {
 }
 
 export async function apiGet<T>(params: Record<string, string> = {}): Promise<T> {
-  const res = await fetch(buildUrl(params));
+  const password = sessionStorage.getItem('minicross_admin_password');
+  const finalParams = { ...params };
+  if (password) {
+    finalParams.password = password;
+  }
+  const res = await fetch(buildUrl(finalParams));
   if (!res.ok) throw new Error('No se pudo conectar con Google Sheets.');
-  return (await res.json()) as T;
+  const data = (await res.json()) as T & { success?: boolean; error?: string };
+  if (data.success === false && data.error) throw new Error(data.error);
+  return data;
 }
 
 export async function apiPost<T>(body: unknown): Promise<T> {
+  const password = sessionStorage.getItem('minicross_admin_password');
+  let finalBody = body;
+  if (password && typeof body === 'object' && body !== null) {
+    finalBody = { ...body, password };
+  }
   const res = await fetch(CONFIG.apiUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(finalBody),
     redirect: 'follow',
   });
   if (!res.ok) throw new Error('Error al enviar datos a Google Sheets.');

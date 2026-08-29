@@ -23,7 +23,10 @@ import Swal from 'sweetalert2';
 import { openResultsModal } from './admin-results-modal';
 
 function isAuthenticated(): boolean {
-  return sessionStorage.getItem(CONFIG.storageKeys.adminSession) === 'true';
+  return (
+    sessionStorage.getItem(CONFIG.storageKeys.adminSession) === 'true' &&
+    Boolean(sessionStorage.getItem('minicross_admin_password'))
+  );
 }
 
 function isHttpUrl(value: string): boolean {
@@ -715,16 +718,27 @@ export async function initAdminPage(): Promise<void> {
 
   if (!isAuthenticated()) {
     app.innerHTML = renderLogin();
-    document.getElementById('login-form')?.addEventListener('submit', (e) => {
+    document.getElementById('login-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const password = (document.getElementById('password') as HTMLInputElement).value;
       const errorEl = document.getElementById('login-error');
-      if (password === CONFIG.adminPassword) {
+
+      sessionStorage.setItem('minicross_admin_password', password);
+
+      try {
+        showSaving('Verificando credenciales...');
+        await loadRegistrations();
         sessionStorage.setItem(CONFIG.storageKeys.adminSession, 'true');
+        Swal.close();
         initAdminPage();
-      } else if (errorEl) {
-        errorEl.textContent = 'Contrasena incorrecta.';
-        errorEl.classList.remove('hidden');
+      } catch (err) {
+        sessionStorage.removeItem('minicross_admin_password');
+        sessionStorage.removeItem(CONFIG.storageKeys.adminSession);
+        Swal.close();
+        if (errorEl) {
+          errorEl.textContent = 'Contrasena incorrecta o error de conexion.';
+          errorEl.classList.remove('hidden');
+        }
       }
     });
     return;

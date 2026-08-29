@@ -2,10 +2,8 @@
  * Configuracion del sitio Minicross 2026
  *
  * PANEL: /panel-minicross-gestion-2026.html
- * Clave: minicross2026
  */
 export const CONFIG = {
-  adminPassword: 'minicross2026',
 
   /** Año del campeonato; la edad para categorías se calcula al 1 de enero de este año. */
   championshipYear: 2026,

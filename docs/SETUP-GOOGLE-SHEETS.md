@@ -29,9 +29,15 @@ Con esta configuracion, las inscripciones se guardan directamente en una Google 
    const DRIVE_FOLDER_ID = 'tu-id-de-la-carpeta-drive';//1oImoS0x__kgBBXaL9HAg3Qf-4Zj0Xz0l
    ```
 4. Guarda el proyecto (Ctrl+S)
-5. En el selector de funciones (arriba), elige **`setupSheets`** — NO elijas `doGet` ni `doPost`
-6. Clic en **Ejecutar** y autoriza los permisos (Sheets + Drive)
-7. Revisa tu Google Sheet: deben aparecer las pestanas `Events` y `Registrations`
+5. En el menú lateral izquierdo, ve a **Configuración del proyecto** (el ícono del engranaje).
+6. Desplázate hacia abajo hasta **Propiedades de la secuencia de comandos**.
+7. Haz clic en **Añadir propiedad del script**.
+8. Escribe `ADMIN_PASSWORD` en el campo Propiedad y escribe la contraseña deseada en el campo Valor (ej: `minicross2026`).
+9. Haz clic en **Guardar propiedades de la secuencia de comandos**.
+10. Vuelve al Editor (ícono `< >`).
+11. En el selector de funciones (arriba), elige **`setupSheets`** — NO elijas `doGet` ni `doPost`
+12. Clic en **Ejecutar** y autoriza los permisos (Sheets + Drive)
+13. Revisa tu Google Sheet: deben aparecer las pestanas `Events` y `Registrations`
 
 > **Nota:** Si ejecutas `doGet` desde el editor veras un error o respuesta vacia. Esa funcion solo funciona cuando la Web App recibe peticiones HTTP desde la pagina web.
 
