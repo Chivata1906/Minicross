@@ -7,11 +7,11 @@
  * Despliega como Web App: Ejecutar como "Yo", Acceso "Cualquier persona".
  */
 
-const SPREADSHEET_ID = '1g5crmfmbcxyvmLMXxYECxO90gFYiXf7P5JaSze7pmbI';
-const DRIVE_FOLDER_ID = '1oImoS0x__kgBBXaL9HAg3Qf-4Zj0Xz0l';
+const SPREADSHEET_ID = '1kAlC3MP2DqH5KXkQQLVZF0SbHV6X8DY3nAyLxO81654';
+const DRIVE_FOLDER_ID = '1TQAM3BE93OjiaODNgI_2SkXLFQ2uqQqM';
 
-const EVENT_HEADERS = ['id', 'name', 'date', 'location', 'city', 'description', 'active', 'reglamentoUrl', 'finished', 'valorInscripcion', 'resultadosUrl'];
-const CATEGORY_HEADERS = ['id', 'label', 'minAge', 'maxAge', 'active'];
+const EVENT_HEADERS = ['id', 'name', 'date', 'location', 'city', 'description', 'active', 'reglamentoUrl', 'finished', 'valorInscripcion', 'championshipId', 'resultadosUrl'];
+const CATEGORY_HEADERS = ['id', 'championshipId', 'label', 'minAge', 'maxAge', 'active'];
 const REG_HEADERS = [
   'id', 'eventId', 'eventName', 'nombre', 'apellido', 'identificacion',
   'identificacionArchivo', 'identificacionFileName', 'identificacionFileType',
@@ -49,13 +49,13 @@ function doGet(e) {
     return jsonResponse({ events: getEvents_(ss) });
   }
 
+  if (action === 'categories') {
+    return jsonResponse({ categories: getCategories_(ss) });
+  }
+
   if (action === 'results') {
     const eventId = (e.parameter.eventId || '').toString();
     return jsonResponse({ results: getEventResults_(ss, eventId) });
-  }
-
-  if (action === 'categories') {
-    return jsonResponse({ categories: getCategories_(ss) });
   }
 
   // Acciones Protegidas (GET) - Requieren contraseña
@@ -66,7 +66,7 @@ function doGet(e) {
     return jsonResponse({ registrations: getRegistrations_(ss) });
   }
 
-  if (action === 'all') {
+  if (action === 'all' || !action) {
     if (password === ADMIN_PASSWORD) {
       return jsonResponse({
         events: getEvents_(ss),
@@ -74,7 +74,7 @@ function doGet(e) {
         categories: getCategories_(ss),
       });
     }
-    // Si no está autorizado para ver todo, solo devolvemos los eventos y categorías públicas
+    // Si no está autorizado para ver todo, solo devolvemos los eventos y categorías
     return jsonResponse({
       events: getEvents_(ss),
       categories: getCategories_(ss),
@@ -106,8 +106,8 @@ function doPost(e) {
     'deleteRegistration',
     'saveEvents',
     'saveResults',
-    'saveRegistrations',
-    'saveCategories'
+    'saveCategories',
+    'saveRegistrations'
   ];
 
   if (adminActions.indexOf(body.action) !== -1) {
@@ -130,16 +130,16 @@ function doPost(e) {
       } catch (err) {
         return jsonResponse({ success: false, error: err.message || String(err) });
       }
-    case 'saveRegistrations':
+    case 'saveCategories':
       try {
-        writeRegistrations_(ss, body.registrations);
+        writeCategories_(ss, body.categories);
         return jsonResponse({ success: true });
       } catch (err) {
         return jsonResponse({ success: false, error: err.message || String(err) });
       }
-    case 'saveCategories':
+    case 'saveRegistrations':
       try {
-        writeCategories_(ss, body.categories);
+        writeRegistrations_(ss, body.registrations);
         return jsonResponse({ success: true });
       } catch (err) {
         return jsonResponse({ success: false, error: err.message || String(err) });
@@ -148,7 +148,6 @@ function doPost(e) {
       return jsonResponse({ success: false, error: 'Accion desconocida o requiere autorizacion' });
   }
 }
-
 
 // ─── Registrations CRUD ──────────────────────────────────────────────────────
 
@@ -194,7 +193,8 @@ function updateRegistration_(ss, id, updates) {
   merged.updatedAt = new Date().toISOString();
   if (merged.fechaNacimiento) {
     merged.fechaNacimiento = parseSheetDate_(merged.fechaNacimiento);
-    merged.edad = calculateAge_(merged.fechaNacimiento);
+    var eventObj = getEventById_(ss, merged.eventId);
+    merged.edad = calculateAge_(merged.fechaNacimiento, eventObj ? eventObj.date : null);
   }
   if (updates.eventId !== undefined) {
     merged.eventName = getEventNameById_(ss, merged.eventId);
@@ -237,28 +237,86 @@ function deleteRegistration_(ss, id) {
 // ─── Pilot number check ──────────────────────────────────────────────────────
 
 function isPilotNumberAvailable_(ss, eventId, numero, excludeId) {
-  const regs = getRegistrations_(ss);
-  for (var i = 0; i < regs.length; i++) {
-    var r = regs[i];
-    if (
-      String(r.eventId) === String(eventId) &&
-      Number(r.numeroPiloto) === Number(numero) &&
-      (!excludeId || String(r.id) !== String(excludeId))
-    ) {
-      return false;
+  var sheet = getRegistrationsSheet_(ss);
+  if (!sheet || sheet.getLastRow() < 2) return true;
+
+  var lastCol = sheet.getLastColumn();
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var eventIdCol = -1;
+  var pilotNumCol = -1;
+  var idCol = -1;
+
+  for (var j = 0; j < headers.length; j++) {
+    var h = String(headers[j] || '').trim();
+    if (h === 'eventId') eventIdCol = j + 1;
+    if (h === 'numeroPiloto') pilotNumCol = j + 1;
+    if (h === 'id') idCol = j + 1;
+  }
+
+  var numRows = sheet.getLastRow() - 1;
+  if (eventIdCol > 0 && pilotNumCol > 0 && numRows > 0) {
+    var eventVals = sheet.getRange(2, eventIdCol, numRows, 1).getValues();
+    var numVals = sheet.getRange(2, pilotNumCol, numRows, 1).getValues();
+    var idVals = (excludeId && idCol > 0) ? sheet.getRange(2, idCol, numRows, 1).getValues() : null;
+
+    for (var i = 0; i < numRows; i++) {
+      if (
+        String(eventVals[i][0]) === String(eventId) &&
+        Number(numVals[i][0]) === Number(numero) &&
+        (!excludeId || !idVals || String(idVals[i][0]) !== String(excludeId))
+      ) {
+        return false;
+      }
     }
   }
   return true;
 }
 
-// ─── Drive: guardar documento de identidad ───────────────────────────────────
+// ─── Normalización de fechas y cálculos ──────────────────────────────────────
 
+function parseSheetDate_(value) {
+  if (value === null || value === undefined || value === '') return '';
+  if (typeof value === 'number' && value > 1000) {
+    var utc = new Date((value - 25569) * 86400 * 1000);
+    if (!isNaN(utc.getTime())) {
+      var y = utc.getUTCFullYear();
+      var m = ('0' + (utc.getUTCMonth() + 1)).slice(-2);
+      var d = ('0' + utc.getUTCDate()).slice(-2);
+      return y + '-' + m + '-' + d;
+    }
+  }
+  if (value instanceof Date) {
+    if (!isNaN(value.getTime())) {
+      var y2 = value.getFullYear();
+      var m2 = ('0' + (value.getMonth() + 1)).slice(-2);
+      var d2 = ('0' + value.getDate()).slice(-2);
+      return y2 + '-' + m2 + '-' + d2;
+    }
+  }
+  var str = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
+  var dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) {
+    var day = ('0' + dmy[1]).slice(-2);
+    var month = ('0' + dmy[2]).slice(-2);
+    return dmy[3] + '-' + month + '-' + day;
+  }
+  var dt = new Date(str.indexOf('T') >= 0 ? str : str + 'T12:00:00');
+  if (!isNaN(dt.getTime())) {
+    var y3 = dt.getFullYear();
+    var m3 = ('0' + (dt.getMonth() + 1)).slice(-2);
+    var d3 = ('0' + dt.getDate()).slice(-2);
+    return y3 + '-' + m3 + '-' + d3;
+  }
+  return str;
+}
 
-function calculateAge_(birthDateStr) {
+function calculateAge_(birthDateStr, refDateStr) {
   if (!birthDateStr) return '';
   var birth = new Date(birthDateStr + 'T12:00:00');
   if (isNaN(birth.getTime())) return '';
-  var ref = new Date();
+  var ref = refDateStr ? new Date(parseSheetDate_(refDateStr) + 'T12:00:00') : new Date();
+  if (isNaN(ref.getTime())) ref = new Date();
   var age = ref.getFullYear() - birth.getFullYear();
   var m = ref.getMonth() - birth.getMonth();
   if (m < 0 || (m === 0 && ref.getDate() < birth.getDate())) age--;
@@ -291,8 +349,9 @@ function prepareRegistrationRow_(ss, data) {
   });
   row.eventName = getEventNameById_(ss, data.eventId);
   row.fechaNacimiento = parseSheetDate_(row.fechaNacimiento);
+  var eventObj = getEventById_(ss, data.eventId);
   if (row.fechaNacimiento) {
-    row.edad = calculateAge_(row.fechaNacimiento);
+    row.edad = calculateAge_(row.fechaNacimiento, eventObj ? eventObj.date : null);
   }
   if (!row.comprobantePagoUrl && data.comprobantePagoArchivo && String(data.comprobantePagoArchivo).indexOf('http') === 0) {
     row.comprobantePagoUrl = data.comprobantePagoArchivo;
@@ -352,44 +411,52 @@ function saveFileToDrive_(data, ss) {
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     return file.getUrl();
   } catch (err) {
-    return '[error al subir: ' + err.message + ']';
+    return '[error al subir archivo: ' + err.message + ']';
   }
-}
-
-// ─── Events ──────────────────────────────────────────────────────────────────
-
-
-function parseSheetDate_(value) {
-  if (value == null || value === '') return '';
-  if (typeof value === 'number' && value > 1000) {
-    var utc = new Date((value - 25569) * 86400 * 1000);
-    if (!isNaN(utc.getTime())) return utc.toISOString().slice(0, 10);
-  }
-  var str = String(value).trim();
-  if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
-  var dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (dmy) {
-    var day = ('0' + dmy[1]).slice(-2);
-    var month = ('0' + dmy[2]).slice(-2);
-    return dmy[3] + '-' + month + '-' + day;
-  }
-  var d = new Date(str.indexOf('T') >= 0 ? str : str + 'T12:00:00');
-  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
-  return str;
 }
 
 function getAvailablePilotNumbers_(ss, eventId) {
-  var regs = getRegistrations_(ss);
+  var sheet = getRegistrationsSheet_(ss);
+  if (!sheet || sheet.getLastRow() < 2) {
+    return allDefaultPilotNumbers_();
+  }
+
+  // Obtenemos solo los encabezados para saber las columnas exactas de eventId y numeroPiloto
+  var lastCol = sheet.getLastColumn();
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var eventIdCol = -1;
+  var pilotNumCol = -1;
+
+  for (var j = 0; j < headers.length; j++) {
+    var h = String(headers[j] || '').trim();
+    if (h === 'eventId') eventIdCol = j + 1;
+    if (h === 'numeroPiloto') pilotNumCol = j + 1;
+  }
+
   var taken = {};
-  for (var i = 0; i < regs.length; i++) {
-    if (String(regs[i].eventId) === String(eventId)) {
-      taken[Number(regs[i].numeroPiloto)] = true;
+  var numRows = sheet.getLastRow() - 1;
+
+  if (eventIdCol > 0 && pilotNumCol > 0 && numRows > 0) {
+    var eventVals = sheet.getRange(2, eventIdCol, numRows, 1).getValues();
+    var numVals = sheet.getRange(2, pilotNumCol, numRows, 1).getValues();
+    for (var i = 0; i < numRows; i++) {
+      if (String(eventVals[i][0]) === String(eventId)) {
+        var pNum = Number(numVals[i][0]);
+        if (pNum) taken[pNum] = true;
+      }
     }
   }
+
   var numbers = [];
   for (var n = 4; n <= 999; n++) {
     if (!taken[n]) numbers.push(n);
   }
+  return numbers;
+}
+
+function allDefaultPilotNumbers_() {
+  var numbers = [];
+  for (var n = 4; n <= 999; n++) numbers.push(n);
   return numbers;
 }
 
@@ -424,6 +491,7 @@ function getEvents_(ss) {
     if (!evt.reglamentoUrl) evt.reglamentoUrl = '';
     if (!evt.resultadosUrl) evt.resultadosUrl = '';
     evt.valorInscripcion = Number(evt.valorInscripcion) || 0;
+    evt.championshipId = normalizeChampionshipId_(evt.championshipId, evt.name);
     return evt;
   });
 }
@@ -434,7 +502,7 @@ function getRegistrations_(ss) {
   return sheetToObjects_(sheet);
 }
 
-// ─── Categorías (gestionadas desde el panel) ────────────────────────────────
+// ─── Categorías por campeonato (gestionadas desde el panel) ──────────────────
 
 function getCategoriesSheet_(ss) {
   return getOrCreateSheet_(ss, 'Categories', CATEGORY_HEADERS);
@@ -454,6 +522,7 @@ function normalizeCategoryRow_(row) {
         activeRaw === '1';
   return {
     id: String(row.id || '').trim(),
+    championshipId: String(row.championshipId || '').trim().toLowerCase() === 'enduro' ? 'enduro' : 'mx',
     label: String(row.label || '').trim(),
     minAge: isFinite(minAge) && minAge >= 0 ? minAge : 0,
     maxAge: isFinite(maxAge) && maxAge > 0 ? maxAge : 999,
@@ -507,23 +576,18 @@ function writeRegistrations_(ss, registrations) {
 
 // ─── Sheet helpers ───────────────────────────────────────────────────────────
 
-
 function parseBoolField_(value) {
   return value === true || value === 'true' || value === 'TRUE' || value === 1 || value === '1';
 }
 
-function getEventsSheet_(ss) {
-  return getOrCreateSheet_(ss, 'Events', EVENT_HEADERS);
+function normalizeChampionshipId_(value, eventName) {
+  var v = String(value || '').trim().toLowerCase();
+  if (v === 'enduro' || v === 'mx') return v;
+  return /enduro/i.test(String(eventName || '')) ? 'enduro' : 'mx';
 }
 
-function eventHeadersMatch_(current, headers) {
-  var trimmed = current.map(function (h) { return String(h).trim(); });
-  while (trimmed.length && !trimmed[trimmed.length - 1]) trimmed.pop();
-  if (trimmed.length !== headers.length) return false;
-  for (var i = 0; i < headers.length; i++) {
-    if (trimmed[i] !== headers[i]) return false;
-  }
-  return true;
+function getEventsSheet_(ss) {
+  return getOrCreateSheet_(ss, 'Events', EVENT_HEADERS);
 }
 
 function syncEventHeaders_(ss, sheet, headers) {
@@ -567,6 +631,7 @@ function prepareEventRow_(ss, data) {
   row.active = parseBoolField_(row.active);
   row.finished = parseBoolField_(row.finished);
   row.valorInscripcion = Number(row.valorInscripcion) || 0;
+  row.championshipId = normalizeChampionshipId_(row.championshipId, row.name);
   if (data.reglamentoArchivo && String(data.reglamentoArchivo).indexOf('data:') === 0) {
     row.reglamentoUrl = saveReglamentoToDrive_(data, ss);
   } else if (data.reglamentoUrl && String(data.reglamentoUrl).indexOf('http') === 0) {
@@ -582,25 +647,57 @@ function prepareEventRow_(ss, data) {
   return row;
 }
 
+// ─── Resultados (JSON y archivos en Drive) ───────────────────────────────────
+
 function getOrCreateResultsFolder_() {
   var root = DriveApp.getFolderById(DRIVE_FOLDER_ID);
   var name = 'Resultados';
   var folders = root.getFoldersByName(name);
-  if (folders.hasNext()) return folders.next();
-  return root.createFolder(name);
+  var folder = folders.hasNext() ? folders.next() : root.createFolder(name);
+  makeDriveFilePublicView_(folder);
+  return folder;
+}
+
+function makeDriveFilePublicView_(fileOrFolder) {
+  if (!fileOrFolder) return;
+  try {
+    fileOrFolder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (err) {
+    try {
+      fileOrFolder.setSharing(DriveApp.Access.ANYONE, DriveApp.Permission.VIEW);
+    } catch (e) {}
+  }
+}
+
+function formatDrivePreviewUrl_(urlOrId) {
+  if (!urlOrId) return '';
+  var str = String(urlOrId).trim();
+  if (str.indexOf('data:') === 0 || str.indexOf('blob:') === 0) return str;
+  var match = str.match(/\/file\/d\/([-\w]{25,})/i) || str.match(/[?&]id=([-\w]{25,})/i) || str.match(/[-\w]{25,}/);
+  if (match) {
+    return 'https://drive.google.com/file/d/' + (match[1] || match[0]) + '/preview';
+  }
+  return str;
+}
+
+function parseDataUriToBlob_(dataUri, fileName, fallbackMime) {
+  var parts = String(dataUri || '').split(',');
+  var header = parts[0] || '';
+  var base64 = parts.length > 1 ? parts[1] : parts[0];
+  var mimeMatch = header.match(/data:([^;]+);/);
+  var mimeType = (mimeMatch && mimeMatch[1]) ? mimeMatch[1] : (fallbackMime || 'application/octet-stream');
+  return Utilities.newBlob(
+    Utilities.base64Decode(base64),
+    mimeType,
+    fileName || 'archivo'
+  );
 }
 
 function uploadResultsBlob_(folder, base64DataUrl, fileName, mimeType) {
-  var parts = String(base64DataUrl || '').split(',');
-  var base64 = parts.length > 1 ? parts[1] : parts[0];
-  var blob = Utilities.newBlob(
-    Utilities.base64Decode(base64),
-    mimeType || 'application/octet-stream',
-    fileName
-  );
+  var blob = parseDataUriToBlob_(base64DataUrl, fileName, mimeType);
   var file = folder.createFile(blob);
-  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  return file.getUrl();
+  makeDriveFilePublicView_(file);
+  return formatDrivePreviewUrl_(file.getId());
 }
 
 function findDriveFileByUrl_(url) {
@@ -677,13 +774,50 @@ function getEventResults_(ss, eventId) {
   if (!event || !event.resultadosUrl) return null;
 
   var file = findDriveFileByUrl_(event.resultadosUrl);
-  if (!file) return null;
+  if (!file) {
+    if (String(event.resultadosUrl).indexOf('http') === 0) {
+      return {
+        eventId: eventId,
+        updatedAt: '',
+        mode: 'single_pdf',
+        singlePdfUrl: event.resultadosUrl,
+        categories: [],
+      };
+    }
+    return null;
+  }
 
   try {
+    makeDriveFilePublicView_(file);
+    var mime = file.getMimeType();
+    if (mime === 'application/pdf' || file.getName().toLowerCase().indexOf('.pdf') !== -1) {
+      return {
+        eventId: eventId,
+        updatedAt: file.getLastUpdated().toISOString(),
+        mode: 'single_pdf',
+        singlePdfUrl: formatDrivePreviewUrl_(file.getId()),
+        categories: [],
+      };
+    }
     var parsed = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+    if (parsed && parsed.singlePdfUrl) {
+      var singlePdfFile = findDriveFileByUrl_(parsed.singlePdfUrl);
+      if (singlePdfFile) {
+        makeDriveFilePublicView_(singlePdfFile);
+        parsed.singlePdfUrl = formatDrivePreviewUrl_(singlePdfFile.getId());
+      } else {
+        parsed.singlePdfUrl = formatDrivePreviewUrl_(parsed.singlePdfUrl);
+      }
+    }
     return parsed;
   } catch (err) {
-    return null;
+    return {
+      eventId: eventId,
+      updatedAt: '',
+      mode: 'single_pdf',
+      singlePdfUrl: formatDrivePreviewUrl_(file.getId()),
+      categories: [],
+    };
   }
 }
 
@@ -709,6 +843,76 @@ function saveEventResults_(ss, data) {
 
   var eventName = data.eventName || getEventNameById_(ss, data.eventId) || data.eventId;
   var folder = getOrCreateResultsFolder_();
+  var isSinglePdf = data.mode === 'single_pdf' || Boolean(data.singlePdfUpload) || (Boolean(data.singlePdfUrl) && (!data.categories || data.categories.length === 0));
+
+  if (isSinglePdf) {
+    var singlePdfUrl = data.singlePdfUrl || '';
+    if (data.singlePdfUpload && data.singlePdfUpload.archivo && data.singlePdfUpload.archivo.indexOf('data:') === 0) {
+      var pdfName = buildDriveFileName_(
+        data.eventId,
+        eventName,
+        'RESULTADOS_OFICIALES',
+        data.singlePdfUpload.fileName || 'resultados.pdf',
+        data.singlePdfUpload.fileType || 'application/pdf'
+      );
+      var pdfBlob = parseDataUriToBlob_(data.singlePdfUpload.archivo, pdfName);
+      var pdfFile = folder.createFile(pdfBlob);
+      makeDriveFilePublicView_(pdfFile);
+      singlePdfUrl = formatDrivePreviewUrl_(pdfFile.getId());
+    } else if (singlePdfUrl) {
+      var existingPdfFile = findDriveFileByUrl_(singlePdfUrl);
+      if (existingPdfFile) {
+        makeDriveFilePublicView_(existingPdfFile);
+        singlePdfUrl = formatDrivePreviewUrl_(existingPdfFile.getId());
+      }
+    }
+
+    var singleResults = {
+      eventId: data.eventId,
+      updatedAt: new Date().toISOString(),
+      mode: 'single_pdf',
+      singlePdfUrl: singlePdfUrl,
+      categories: [],
+    };
+
+    var jsonName = buildDriveFileName_(
+      data.eventId,
+      eventName,
+      'RESULTADOS',
+      'resultados.json',
+      'application/json'
+    );
+    var jsonBlob = Utilities.newBlob(JSON.stringify(singleResults), 'application/json', jsonName);
+
+    var existingEvents = getEvents_(ss);
+    var existingUrl = '';
+    for (var i = 0; i < existingEvents.length; i++) {
+      if (existingEvents[i].id === data.eventId) {
+        existingUrl = existingEvents[i].resultadosUrl || '';
+        break;
+      }
+    }
+
+    var existingFile = findDriveFileByUrl_(existingUrl);
+    if (existingFile) {
+      try {
+        existingFile.setTrashed(true);
+      } catch (err) {}
+    }
+
+    var created = folder.createFile(jsonBlob);
+    makeDriveFilePublicView_(created);
+    var resultadosUrl = created.getUrl();
+
+    updateEventResultadosUrl_(ss, data.eventId, singlePdfUrl || resultadosUrl);
+
+    return {
+      success: true,
+      results: singleResults,
+      resultadosUrl: singlePdfUrl || resultadosUrl,
+    };
+  }
+
   var categories = (data.categories || []).map(function (cat) {
     var out = {
       categoryId: cat.categoryId,
@@ -724,6 +928,7 @@ function saveEventResults_(ss, data) {
   var results = {
     eventId: data.eventId,
     updatedAt: new Date().toISOString(),
+    mode: 'categories',
     categories: categories,
   };
 
@@ -769,16 +974,6 @@ function saveEventResults_(ss, data) {
 
 function getRegistrationsSheet_(ss) {
   return getOrCreateSheet_(ss, 'Registrations', REG_HEADERS);
-}
-
-function registrationHeadersMatch_(current, headers) {
-  var trimmed = current.map(function (h) { return String(h).trim(); });
-  while (trimmed.length && !trimmed[trimmed.length - 1]) trimmed.pop();
-  if (trimmed.length !== headers.length) return false;
-  for (var i = 0; i < headers.length; i++) {
-    if (trimmed[i] !== headers[i]) return false;
-  }
-  return true;
 }
 
 function migrateRegistrationRows_(ss, rows) {
@@ -902,6 +1097,7 @@ function syncEventHeadersFull_(ss, sheet, headers) {
     if (!row.reglamentoUrl) row.reglamentoUrl = '';
     if (!row.resultadosUrl) row.resultadosUrl = '';
     row.valorInscripcion = Number(row.valorInscripcion) || 0;
+    row.championshipId = normalizeChampionshipId_(row.championshipId, row.name);
   });
   writeObjects_(sheet, headers, remapRowsToHeaders_(rows, headers));
 }
@@ -952,7 +1148,28 @@ function jsonResponse(data) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// ─── Utilidad: crear hojas iniciales (ejecutar una vez manualmente) ──────────
+// ─── Utilidades y reparaciones ──────────────────────────────────────────────
+
+/**
+ * Prueba minima del editor. Si ESTA falla con "error desconocido",
+ * el problema es de Google Apps Script (no del codigo ni de tus datos).
+ */
+function ping() {
+  Logger.log('ping OK - el editor puede ejecutar codigo');
+}
+
+/**
+ * Solo agrega columnas nuevas a Events (p. ej. resultadosUrl) sin backup ni remapear.
+ * NUNCA borra filas. Usa ESTA solo si quieres forzar la columna desde el editor.
+ * En la practica NO es obligatoria: al usar el sitio, getEvents_ ya agrega columnas faltantes.
+ */
+function addMissingEventColumns() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = getEventsSheet_(ss);
+  ensureSheetHeaders_(sheet, EVENT_HEADERS);
+  Logger.log('Encabezados Events: ' + readSheetHeaders_(sheet).join(', '));
+  Logger.log('Listo. Ninguna fila fue borrada.');
+}
 
 /** Ejecutar manualmente si la hoja Events tiene columnas desalineadas. Crea backup antes de remapear. */
 function repairEventsSheet() {
@@ -999,27 +1216,6 @@ function repairRegistrationsSheet() {
   Logger.log('Hoja Registrations reparada. Filas: ' + Math.max(0, sheet.getLastRow() - 1));
 }
 
-/**
- * Prueba minima del editor. Si ESTA falla con "error desconocido",
- * el problema es de Google Apps Script (no del codigo ni de tus datos).
- */
-function ping() {
-  Logger.log('ping OK - el editor puede ejecutar codigo');
-}
-
-/**
- * Solo agrega columnas nuevas a Events (p. ej. resultadosUrl) sin backup ni remapear.
- * NUNCA borra filas. Usa ESTA solo si quieres forzar la columna desde el editor.
- * En la practica NO es obligatoria: al usar el sitio, getEvents_ ya agrega columnas faltantes.
- */
-function addMissingEventColumns() {
-  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  var sheet = getEventsSheet_(ss);
-  ensureSheetHeaders_(sheet, EVENT_HEADERS);
-  Logger.log('Encabezados Events: ' + readSheetHeaders_(sheet).join(', '));
-  Logger.log('Listo. Ninguna fila fue borrada.');
-}
-
 /** Repara Events y Registrations en una sola ejecucion. */
 function repairAllSheets() {
   try {
@@ -1055,7 +1251,9 @@ function setupSheets() {
         description: 'Primera valida del campeonato. Triple Corona: 3 mangas.',
         active: true,
         reglamentoUrl: '',
+        resultadosUrl: '',
         finished: false,
+        championshipId: 'mx',
       },
       {
         id: 'evt-002',
@@ -1066,7 +1264,9 @@ function setupSheets() {
         description: 'Segunda valida del campeonato.',
         active: true,
         reglamentoUrl: '',
+        resultadosUrl: '',
         finished: false,
+        championshipId: 'mx',
       },
     ]);
   }
@@ -1082,4 +1282,22 @@ function testConnection() {
   Logger.log('Carpeta Drive: ' + folder.getName());
   Logger.log('Eventos: ' + getEvents_(ss).length);
   Logger.log('Todo OK. Ahora despliega como Web App.');
+}
+
+/**
+ * Utilidad administrativa para ejecutar desde el editor de Google Apps Script:
+ * Asigna permisos públicos de lectura ("Cualquiera con el enlace puede ver")
+ * a la carpeta Resultados y a todos los archivos y PDFs dentro de ella.
+ */
+function fixAllResultsDrivePermissions() {
+  var folder = getOrCreateResultsFolder_();
+  makeDriveFilePublicView_(folder);
+  var files = folder.getFiles();
+  var count = 0;
+  while (files.hasNext()) {
+    var f = files.next();
+    makeDriveFilePublicView_(f);
+    count++;
+  }
+  Logger.log('Se asignaron permisos publicos de lectura a ' + count + ' archivos en la carpeta Resultados.');
 }
