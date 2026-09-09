@@ -484,6 +484,20 @@ export async function loadEventResults(eventId: string): Promise<EventResults | 
   return readLocalResultsMap()[eventId] ?? null;
 }
 
+export async function loadAllPublishedResults(): Promise<{ event: Event; results: EventResults }[]> {
+  const events = await loadEvents();
+  const publishedEvents = events.filter(eventHasResults);
+
+  const resultsList = await Promise.all(
+    publishedEvents.map(async (event) => {
+      const results = await loadEventResults(event.id);
+      return results ? { event, results } : null;
+    })
+  );
+
+  return resultsList.filter((item): item is { event: Event; results: EventResults } => item !== null);
+}
+
 export async function saveEventResults(
   payload: EventResultsSavePayload
 ): Promise<{ results: EventResults; resultadosUrl: string }> {

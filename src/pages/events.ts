@@ -36,7 +36,7 @@ function renderEventCard(event: Event): string {
     ? `<a href="${event.reglamentoUrl}" target="_blank" rel="noopener noreferrer" class="btn-outline w-full sm:w-auto text-center">Ver convocatoria</a>`
     : '';
   const resultadosBtn = eventHasResults(event)
-    ? `<a href="./resultados.html?evento=${event.id}" class="btn-secondary w-full sm:w-auto text-center">Ver resultados</a>`
+    ? `<a href="./resultados.html?evento=${event.id}&vista=valida" class="btn-secondary w-full sm:w-auto text-center">Ver resultados</a>`
     : '';
   const inscripcionBtn = event.active
     ? `<a href="./inscripcion.html?evento=${event.id}" class="btn-primary w-full sm:w-auto text-center">Inscribirme en este evento</a>`
@@ -68,12 +68,31 @@ export async function initEventsPage(): Promise<void> {
   app.innerHTML = `
     ${renderNavbar('eventos')}
     <main class="mx-auto max-w-7xl px-4 py-12">
-      <div class="mb-10 text-center">
+      <div class="mb-8 text-center">
         <h1 class="section-title mb-4">Eventos del Campeonato</h1>
         <p class="text-gray-light max-w-2xl mx-auto">
-          Consulta las validas del campeonato, descarga el reglamento y revisa los resultados cuando esten disponibles.
+          Consulta las válidas del campeonato, descarga el reglamento y revisa las clasificaciones.
         </p>
       </div>
+
+      <!-- Banner de la Tabla General del Campeonato -->
+      <div class="mb-10 rounded-2xl border border-secondary/30 bg-gradient-to-r from-secondary/15 via-primary/80 to-accent/15 p-6 md:p-8 shadow-glow flex flex-col md:flex-row items-center justify-between gap-6">
+        <div class="space-y-2 text-center md:text-left">
+          <div class="inline-flex items-center gap-2 rounded-full bg-secondary/20 px-3 py-1 text-xs font-semibold text-secondary">
+            🏆 Clasificación Oficial
+          </div>
+          <h2 class="font-title text-2xl md:text-3xl tracking-wide text-white">
+            Tabla General de Posiciones del Campeonato
+          </h2>
+          <p class="text-sm text-gray-light max-w-xl">
+            Suma acumulada de puntos válida a válida por categoría, calculada con base en los resultados oficiales de la manga final.
+          </p>
+        </div>
+        <a href="./resultados.html?vista=general" class="btn-secondary whitespace-nowrap py-3 px-6 text-base font-semibold shadow-glow shrink-0">
+          Ver Tabla General
+        </a>
+      </div>
+
       <div id="events-list" class="grid gap-6 md:grid-cols-2">
         <div class="col-span-full card border border-secondary/30">${renderLoadingPanel()}</div>
       </div>
