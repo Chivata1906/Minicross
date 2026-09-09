@@ -39,6 +39,73 @@ export interface OfficialCategoryEntry {
   points: number;
 }
 
+// ─── DICCIONARIO DE HIPOCORÍSTICOS Y APODOS EN ESPAÑOL ───────────────────────
+
+const SPANISH_NICKNAMES: Record<string, string[]> = {
+  maxi: ['maximiliano', 'maximo'],
+  maximiliano: ['maxi', 'max'],
+  maximo: ['maxi', 'max'],
+  santi: ['santiago'],
+  santiago: ['santi'],
+  nico: ['nicolas'],
+  nicolas: ['nico'],
+  mati: ['matias', 'mateo'],
+  matias: ['mati'],
+  mateo: ['mati', 'teo'],
+  teo: ['mateo'],
+  sebas: ['sebastian'],
+  sebastian: ['sebas', 'tian'],
+  jero: ['jeronimo'],
+  jeronimo: ['jero'],
+  sami: ['samuel'],
+  samuel: ['sami'],
+  dani: ['daniel', 'daniela'],
+  daniel: ['dani'],
+  gabi: ['gabriel', 'gabriela'],
+  gabriel: ['gabi'],
+  alejo: ['alejandro'],
+  alex: ['alejandro', 'alexander'],
+  alejandro: ['alejo', 'alex'],
+  fede: ['federico'],
+  federico: ['fede'],
+  valen: ['valentino', 'valentin', 'valentina'],
+  valentino: ['valen', 'tino'],
+  valentin: ['valen'],
+  juanjo: ['juan', 'jose'],
+  juani: ['juan', 'ignacio'],
+  juanse: ['juan', 'sebastian'],
+  manu: ['manuel', 'manuela'],
+  manuel: ['manu'],
+  rafa: ['rafael'],
+  rafael: ['rafa'],
+  nacho: ['ignacio'],
+  ignacio: ['nacho'],
+  beto: ['alberto', 'roberto'],
+  alberto: ['beto'],
+  roberto: ['beto'],
+  lucho: ['luis'],
+  luis: ['lucho'],
+  pipe: ['felipe'],
+  felipe: ['pipe'],
+  cris: ['cristian', 'cristobal'],
+  cristian: ['cris'],
+  tomi: ['tomas'],
+  tomas: ['tomi'],
+  leo: ['leonardo', 'leonel'],
+  leonardo: ['leo'],
+  joaco: ['joaquin'],
+  joaquin: ['joaco'],
+  facu: ['facundo'],
+  facundo: ['facu'],
+  benja: ['benjamin'],
+  benjamin: ['benja'],
+  emi: ['emilio', 'emiliano'],
+  emilio: ['emi'],
+  emiliano: ['emi'],
+  lucas: ['luca'],
+  luca: ['lucas'],
+};
+
 // ─── UTILIDADES DE NORMALIZACIÓN Y DISTANCIA ─────────────────────────────────
 
 /**
@@ -90,9 +157,9 @@ export function levenshteinDistance(a: string, b: string): number {
         matrix[i][j] = matrix[i - 1][j - 1];
       } else {
         matrix[i][j] = Math.min(
-          matrix[i - 1][j - 1] + 1, // sustitución
-          matrix[i][j - 1] + 1,     // inserción
-          matrix[i - 1][j] + 1      // borrado
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
         );
       }
     }
@@ -114,17 +181,27 @@ function areTokensFuzzyEqual(tokenA: string, tokenB: string): boolean {
 }
 
 /**
- * Determina si el primer nombre (o token inicial) es incompatible.
- * Ej: "Martin" vs "Matias" tienen distancia 3 -> incompatible.
- * "Santiago" vs "Santigo" tienen distancia 1 -> compatible.
+ * Comprueba si dos primeros nombres son compatibles (idénticos, error de dedo,
+ * hipocorístico como Maxi <-> Maximiliano, o prefijo directo).
  */
-function areFirstNamesContradictory(tokensA: string[], tokensB: string[]): boolean {
-  if (tokensA.length === 0 || tokensB.length === 0) return false;
-  const firstA = tokensA[0];
-  const firstB = tokensB[0];
-  if (firstA === firstB) return false;
+export function areFirstNamesCompatible(tokenA: string, tokenB: string): boolean {
+  if (tokenA === tokenB) return true;
 
-  return !areTokensFuzzyEqual(firstA, firstB);
+  // 1. Error de dedo leve
+  if (areTokensFuzzyEqual(tokenA, tokenB)) return true;
+
+  // 2. Diccionario de hipocorísticos
+  if (SPANISH_NICKNAMES[tokenA]?.includes(tokenB) || SPANISH_NICKNAMES[tokenB]?.includes(tokenA)) {
+    return true;
+  }
+
+  // 3. Prefijo directo (ej. "maxi" es prefijo de "maximiliano", "santi" de "santiago")
+  const [shorter, longer] = tokenA.length <= tokenB.length ? [tokenA, tokenB] : [tokenB, tokenA];
+  if (shorter.length >= 3 && longer.startsWith(shorter)) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -145,23 +222,47 @@ export function areRidersSamePerson(
   const tokensA = tokenizeName(candidate.name);
   const tokensB = tokenizeName(existing.name);
 
+  const cleanNumA = candidate.number.replace(/^#+/, '').trim();
+  const numMatches = cleanNumA && existing.allNumbers.some((num) => num.replace(/^#+/, '').trim() === cleanNumA);
+
   if (tokensA.length === 0 || tokensB.length === 0) {
-    const cleanNumA = candidate.number.replace(/^#+/, '').trim();
-    const cleanNumB = existing.number.replace(/^#+/, '').trim();
-    return cleanNumA !== '' && cleanNumA === cleanNumB;
+    return Boolean(numMatches);
   }
 
-  // 2. Guardián: primeros nombres contradictorios
-  if (areFirstNamesContradictory(tokensA, tokensB)) {
+  const firstA = tokensA[0];
+  const firstB = tokensB[0];
+  const firstNamesCompatible = areFirstNamesCompatible(firstA, firstB);
+
+  // 2. Guardián: Si los primeros nombres son contradictorios (ej. Martin vs Matias),
+  // NUNCA son la misma persona.
+  if (!firstNamesCompatible) {
     return false;
   }
 
-  // 3. Coincidencia por subconjunto de tokens
+  // 3. Coincidencia reforzada cuando el número de piloto coincide exactamente (ej. #888)
+  if (numMatches) {
+    const restA = tokensA.slice(1);
+    const restB = tokensB.slice(1);
+    // Si ambos tienen al menos un apellido, comprobar que coincida (ej. Yepes == Yepes)
+    if (restA.length > 0 && restB.length > 0) {
+      const shareLastName = restA.some((tA) =>
+        restB.some((tB) => areTokensFuzzyEqual(tA, tB) || tA === tB)
+      );
+      if (shareLastName) return true;
+    } else {
+      // Si uno solo anotó su nombre/apodo y el número coincide
+      return true;
+    }
+  }
+
+  // 4. Coincidencia por subconjunto de tokens (ej. "Matias Gomez" vs "Matias Gomez Orjuela")
   const [shorter, longer] = tokensA.length <= tokensB.length ? [tokensA, tokensB] : [tokensB, tokensA];
 
   let matches = 0;
   for (const shortToken of shorter) {
-    const found = longer.some((longToken) => areTokensFuzzyEqual(shortToken, longToken));
+    const found = longer.some(
+      (longToken) => areTokensFuzzyEqual(shortToken, longToken) || areFirstNamesCompatible(shortToken, longToken)
+    );
     if (found) matches++;
   }
 
@@ -169,21 +270,18 @@ export function areRidersSamePerson(
     return true;
   }
 
-  const cleanNumA = candidate.number.replace(/^#+/, '').trim();
-  const numMatches = cleanNumA && existing.allNumbers.some((num) => num.replace(/^#+/, '').trim() === cleanNumA);
-
   if (matches >= 1 && matches === shorter.length && numMatches) {
     return true;
   }
 
-  // 4. Distancia de Levenshtein global en el nombre normalizado
+  // 5. Distancia de Levenshtein global en el nombre completo
   const fullDist = levenshteinDistance(normA, normB);
   const maxLen = Math.max(normA.length, normB.length);
   if (maxLen >= 8 && fullDist <= 2) {
     return true;
   }
 
-  if (numMatches && maxLen >= 10 && fullDist <= 3) {
+  if (numMatches && maxLen >= 8 && fullDist <= 4) {
     return true;
   }
 
@@ -241,12 +339,11 @@ export function extractRiderBike(row: Record<string, string>): string {
 
 /**
  * Obtiene los registros oficiales de una categoría para una válida:
- * 1. Si existe la manga "final", se toma la final (sumatoria consolidada de mangas).
- * 2. Si NO existe "final" y la categoría corrió manga única (ej. solo manga1), se toman los puntos de esa manga.
- * 3. Si se corrieron varias mangas pero no se cargó archivo final, se consolidan las mangas de esa válida.
+ * 1. Si existe la manga "final", se toma la final.
+ * 2. Si NO existe "final" y la categoría corrió manga única, se toma esa manga.
+ * 3. Si se corrieron varias mangas sin archivo final, se consolidan las mangas de esa válida.
  */
 export function getOfficialCategoryEntries(cat: CategoryResults): OfficialCategoryEntry[] {
-  // 1. Si existe manga final con filas, se toma exclusivamente la final
   if (cat.final && cat.final.rows && cat.final.rows.length > 0) {
     return cat.final.rows.map((row) => ({
       number: extractRiderNumber(row),
@@ -256,7 +353,6 @@ export function getOfficialCategoryEntries(cat: CategoryResults): OfficialCatego
     }));
   }
 
-  // 2. Recopilar mangas disponibles
   const availableMangas: ResultsTable[] = [];
   if (cat.manga1?.rows?.length) availableMangas.push(cat.manga1);
   if (cat.manga2?.rows?.length) availableMangas.push(cat.manga2);
@@ -266,7 +362,6 @@ export function getOfficialCategoryEntries(cat: CategoryResults): OfficialCatego
     return [];
   }
 
-  // Si solo hay una manga única, sus puntos son los oficiales de la válida
   if (availableMangas.length === 1) {
     return availableMangas[0].rows.map((row) => ({
       number: extractRiderNumber(row),
@@ -276,7 +371,6 @@ export function getOfficialCategoryEntries(cat: CategoryResults): OfficialCatego
     }));
   }
 
-  // Si hubo varias mangas pero no hay archivo final consolidado, sumamos las mangas de esa válida
   const riderMap = new Map<string, OfficialCategoryEntry>();
   availableMangas.forEach((manga) => {
     manga.rows.forEach((row) => {
@@ -316,12 +410,12 @@ interface CategoryAccumulator {
 
 /**
  * Calcula la sumatoria acumulada de puntos del campeonato por categoría,
- * tomando la manga final o la manga única en caso de categorías con una sola carrera.
+ * unificando inteligentemente hipocorísticos/apodos y aplicando la regla oficial de desempate
+ * por mejor resultado en la válida más reciente.
  */
 export function computeChampionshipStandings(
   publishedList: PublishedEventResult[]
 ): ChampionshipCategoryStandings[] {
-  // Ordenar eventos cronológicamente
   const sortedEvents = [...publishedList].sort((a, b) => a.event.date.localeCompare(b.event.date));
 
   const categoryMap = new Map<string, CategoryAccumulator>();
@@ -336,7 +430,6 @@ export function computeChampionshipStandings(
     };
 
     results.categories.forEach((cat) => {
-      // Obtenemos los registros oficiales (final o manga única)
       const officialEntries = getOfficialCategoryEntries(cat);
       if (!officialEntries || officialEntries.length === 0) {
         return;
@@ -359,12 +452,10 @@ export function computeChampionshipStandings(
 
         if (!name && !number) return;
 
-        // Formato estándar del número
         const formattedNumber = number
           ? (number.startsWith('#') ? number : `#${number}`)
           : '';
 
-        // Buscar si ya existe este piloto en la categoría.
         // REGLA DE ORO FÍSICA: Dos registros en el MISMO evento son personas distintas.
         let matchedRider = catEntry.riders.find((existing) => {
           if (existing.pointsByEvent[event.id] !== undefined) {
@@ -393,7 +484,6 @@ export function computeChampionshipStandings(
           matchedRider = newRider;
         }
 
-        // Actualizar datos del piloto
         matchedRider.pointsByEvent[event.id] = points;
         if (formattedNumber) {
           matchedRider.latestNumber = formattedNumber;
@@ -404,11 +494,15 @@ export function computeChampionshipStandings(
           matchedRider.latestBike = bike;
         }
 
-        // Si el nuevo nombre es más completo y detallado, actualizar el nombre canónico
+        // Si el nuevo nombre es más completo y formal (ej. "Maximiliano Yepes" > "Maxi Yepes"),
+        // adoptarlo como nombre canónico oficial
         if (name) {
           const currentTokens = tokenizeName(matchedRider.canonicalName);
           const newTokens = tokenizeName(name);
-          if (newTokens.length > currentTokens.length || (newTokens.length === currentTokens.length && name.length > matchedRider.canonicalName.length)) {
+          if (
+            newTokens.length > currentTokens.length ||
+            (newTokens.length === currentTokens.length && name.length > matchedRider.canonicalName.length)
+          ) {
             matchedRider.canonicalName = name;
           }
         }
@@ -444,20 +538,26 @@ export function computeChampionshipStandings(
       };
     });
 
-    // Ordenar de mayor a menor puntaje
-    const lastEventId = eventsList[eventsList.length - 1]?.id;
-
+    // ─── CRITERIO OFICIAL DE CLASIFICACIÓN Y DESEMPATE REGRESIVO ───────────
+    // 1. Mayor puntaje total acumulado.
+    // 2. Si empatan en puntos totales: desempata el que tenga más puntos en la válida más reciente (la última disputada).
+    // 3. Si siguen empatados: se evalúa hacia atrás de forma regresiva (penúltima, antepenúltima...).
+    // 4. Nombre alfabético.
     ridersArray.sort((a, b) => {
       if (b.totalPoints !== a.totalPoints) {
         return b.totalPoints - a.totalPoints;
       }
-      if (lastEventId) {
-        const lastPtsA = a.pointsByEvent[lastEventId] ?? 0;
-        const lastPtsB = b.pointsByEvent[lastEventId] ?? 0;
-        if (lastPtsB !== lastPtsA) {
-          return lastPtsB - lastPtsA;
+
+      // Desempate regresivo: desde la válida más reciente (eventsList.length - 1) hacia la más antigua (0)
+      for (let i = eventsList.length - 1; i >= 0; i--) {
+        const evId = eventsList[i].id;
+        const ptsA = a.pointsByEvent[evId] ?? 0;
+        const ptsB = b.pointsByEvent[evId] ?? 0;
+        if (ptsB !== ptsA) {
+          return ptsB - ptsA; // El que sumó más en la válida más reciente se queda con la posición
         }
       }
+
       return a.name.localeCompare(b.name);
     });
 
