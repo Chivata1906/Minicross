@@ -1,4 +1,4 @@
-import type { Event, EventResults } from '../types';
+import type { CategoryResults, Event, EventResults, ResultsTable } from '../types';
 
 export interface ChampionshipEventRef {
   id: string;
@@ -32,6 +32,13 @@ export interface PublishedEventResult {
   results: EventResults;
 }
 
+export interface OfficialCategoryEntry {
+  number: string;
+  name: string;
+  bike: string;
+  points: number;
+}
+
 // ─── UTILIDADES DE NORMALIZACIÓN Y DISTANCIA ─────────────────────────────────
 
 /**
@@ -53,7 +60,6 @@ export function normalizeKey(str: string): string {
 export function tokenizeName(name: string): string[] {
   const normalized = normalizeKey(name);
   if (!normalized) return [];
-  // Excluir conectores habituales como de, del, la, jr, junior
   const stopWords = new Set(['de', 'del', 'la', 'las', 'los', 'el', 'y', 'jr', 'junior', 'hijo', 'ii', 'iii']);
   return normalized
     .split(' ')
@@ -101,18 +107,16 @@ export function levenshteinDistance(a: string, b: string): number {
 function areTokensFuzzyEqual(tokenA: string, tokenB: string): boolean {
   if (tokenA === tokenB) return true;
   const maxLen = Math.max(tokenA.length, tokenB.length);
-  // Para palabras muy cortas (ej. 2-4 letras), no toleramos errores
   if (maxLen <= 4) return false;
 
   const dist = levenshteinDistance(tokenA, tokenB);
-  // 1 error para palabras de 5-7 letras, 2 errores para palabras mayores
   return maxLen <= 7 ? dist <= 1 : dist <= 2;
 }
 
 /**
  * Determina si el primer nombre (o token inicial) es incompatible.
- * Ej: "Martin" vs "Matias" tienen distancia 3 -> incompatible (NO son la misma persona).
- * "Santiago" vs "Santigo" tienen distancia 1 -> compatible (error de dedo).
+ * Ej: "Martin" vs "Matias" tienen distancia 3 -> incompatible.
+ * "Santiago" vs "Santigo" tienen distancia 1 -> compatible.
  */
 function areFirstNamesContradictory(tokensA: string[], tokensB: string[]): boolean {
   if (tokensA.length === 0 || tokensB.length === 0) return false;
@@ -120,13 +124,11 @@ function areFirstNamesContradictory(tokensA: string[], tokensB: string[]): boole
   const firstB = tokensB[0];
   if (firstA === firstB) return false;
 
-  // Si son diferentes, comprobar si es un simple error tipográfico
   return !areTokensFuzzyEqual(firstA, firstB);
 }
 
 /**
  * Algoritmo inteligente de coincidencia entre dos pilotos en la misma categoría.
- * Evalúa: coincidencia exacta, coincidencia de subconjunto de tokens y similitud difusa.
  */
 export function areRidersSamePerson(
   candidate: { name: string; number: string },
@@ -144,20 +146,17 @@ export function areRidersSamePerson(
   const tokensB = tokenizeName(existing.name);
 
   if (tokensA.length === 0 || tokensB.length === 0) {
-    // Si no hay nombre pero sí número idéntico válido
     const cleanNumA = candidate.number.replace(/^#+/, '').trim();
     const cleanNumB = existing.number.replace(/^#+/, '').trim();
     return cleanNumA !== '' && cleanNumA === cleanNumB;
   }
 
-  // 2. Guardián: si los primeros nombres son contradictorios (ej: "Martin" vs "Matias"),
-  // NO son la misma persona bajo ninguna circunstancia.
+  // 2. Guardián: primeros nombres contradictorios
   if (areFirstNamesContradictory(tokensA, tokensB)) {
     return false;
   }
 
-  // 3. Coincidencia por subconjunto de tokens (ej: "Matias Gomez Orjuela" vs "Matias Gomez")
-  // El nombre más corto debe coincidir palabra por palabra (o con fuzzy leve) en el más largo.
+  // 3. Coincidencia por subconjunto de tokens
   const [shorter, longer] = tokensA.length <= tokensB.length ? [tokensA, tokensB] : [tokensB, tokensA];
 
   let matches = 0;
@@ -166,13 +165,10 @@ export function areRidersSamePerson(
     if (found) matches++;
   }
 
-  // Si todas las palabras del nombre más corto están presentes en el nombre más largo:
-  // y hay al menos 2 tokens coincidentes (ej. Nombre + Apellido)
   if (matches === shorter.length && matches >= 2) {
     return true;
   }
 
-  // Si solo hay 1 token pero el número de piloto coincide exactamente
   const cleanNumA = candidate.number.replace(/^#+/, '').trim();
   const numMatches = cleanNumA && existing.allNumbers.some((num) => num.replace(/^#+/, '').trim() === cleanNumA);
 
@@ -180,14 +176,13 @@ export function areRidersSamePerson(
     return true;
   }
 
-  // 4. Distancia de Levenshtein global en el nombre normalizado (para dedazos generales)
+  // 4. Distancia de Levenshtein global en el nombre normalizado
   const fullDist = levenshteinDistance(normA, normB);
   const maxLen = Math.max(normA.length, normB.length);
   if (maxLen >= 8 && fullDist <= 2) {
     return true;
   }
 
-  // Si el número coincide y la similitud del nombre es muy alta (distancia <= 3 en nombres largos)
   if (numMatches && maxLen >= 10 && fullDist <= 3) {
     return true;
   }
@@ -244,6 +239,67 @@ export function extractRiderBike(row: Record<string, string>): string {
   return raw || '';
 }
 
+/**
+ * Obtiene los registros oficiales de una categoría para una válida:
+ * 1. Si existe la manga "final", se toma la final (sumatoria consolidada de mangas).
+ * 2. Si NO existe "final" y la categoría corrió manga única (ej. solo manga1), se toman los puntos de esa manga.
+ * 3. Si se corrieron varias mangas pero no se cargó archivo final, se consolidan las mangas de esa válida.
+ */
+export function getOfficialCategoryEntries(cat: CategoryResults): OfficialCategoryEntry[] {
+  // 1. Si existe manga final con filas, se toma exclusivamente la final
+  if (cat.final && cat.final.rows && cat.final.rows.length > 0) {
+    return cat.final.rows.map((row) => ({
+      number: extractRiderNumber(row),
+      name: extractRiderName(row),
+      bike: extractRiderBike(row),
+      points: extractFinalPoints(row),
+    }));
+  }
+
+  // 2. Recopilar mangas disponibles
+  const availableMangas: ResultsTable[] = [];
+  if (cat.manga1?.rows?.length) availableMangas.push(cat.manga1);
+  if (cat.manga2?.rows?.length) availableMangas.push(cat.manga2);
+  if (cat.manga3?.rows?.length) availableMangas.push(cat.manga3);
+
+  if (availableMangas.length === 0) {
+    return [];
+  }
+
+  // Si solo hay una manga única, sus puntos son los oficiales de la válida
+  if (availableMangas.length === 1) {
+    return availableMangas[0].rows.map((row) => ({
+      number: extractRiderNumber(row),
+      name: extractRiderName(row),
+      bike: extractRiderBike(row),
+      points: extractFinalPoints(row),
+    }));
+  }
+
+  // Si hubo varias mangas pero no hay archivo final consolidado, sumamos las mangas de esa válida
+  const riderMap = new Map<string, OfficialCategoryEntry>();
+  availableMangas.forEach((manga) => {
+    manga.rows.forEach((row) => {
+      const number = extractRiderNumber(row);
+      const name = extractRiderName(row);
+      const bike = extractRiderBike(row);
+      const points = extractFinalPoints(row);
+      if (!name && !number) return;
+
+      const key = normalizeKey(name) || number.replace(/^#+/, '').trim();
+      if (!riderMap.has(key)) {
+        riderMap.set(key, { number, name, bike, points: 0 });
+      }
+      const entry = riderMap.get(key)!;
+      entry.points += points;
+      if (bike && entry.bike === '-') entry.bike = bike;
+      if (number && !entry.number) entry.number = number;
+    });
+  });
+
+  return Array.from(riderMap.values());
+}
+
 interface CategoryAccumulator {
   categoryId: string;
   categoryLabel: string;
@@ -260,8 +316,7 @@ interface CategoryAccumulator {
 
 /**
  * Calcula la sumatoria acumulada de puntos del campeonato por categoría,
- * teniendo ÚNICAMENTE en cuenta los puntos totales de la manga "final" de cada válida,
- * unificando inteligentemente a los pilotos con tolerancia a cambios de número y nombres parciales/erratas.
+ * tomando la manga final o la manga única en caso de categorías con una sola carrera.
  */
 export function computeChampionshipStandings(
   publishedList: PublishedEventResult[]
@@ -281,9 +336,9 @@ export function computeChampionshipStandings(
     };
 
     results.categories.forEach((cat) => {
-      // Tomamos ÚNICAMENTE la manga "final"
-      const finalTable = cat.final;
-      if (!finalTable || !finalTable.rows || finalTable.rows.length === 0) {
+      // Obtenemos los registros oficiales (final o manga única)
+      const officialEntries = getOfficialCategoryEntries(cat);
+      if (!officialEntries || officialEntries.length === 0) {
         return;
       }
 
@@ -299,11 +354,8 @@ export function computeChampionshipStandings(
       const catEntry = categoryMap.get(cat.categoryId)!;
       catEntry.eventsInCat.set(event.id, eventRef);
 
-      finalTable.rows.forEach((row) => {
-        const number = extractRiderNumber(row);
-        const name = extractRiderName(row);
-        const bike = extractRiderBike(row);
-        const points = extractFinalPoints(row);
+      officialEntries.forEach((entry) => {
+        const { number, name, bike, points } = entry;
 
         if (!name && !number) return;
 
@@ -314,10 +366,9 @@ export function computeChampionshipStandings(
 
         // Buscar si ya existe este piloto en la categoría.
         // REGLA DE ORO FÍSICA: Dos registros en el MISMO evento son personas distintas.
-        // Solo podemos emparejar con un piloto existente que NO tenga ya puntaje en este mismo evento.
         let matchedRider = catEntry.riders.find((existing) => {
           if (existing.pointsByEvent[event.id] !== undefined) {
-            return false; // Ya compitió en este evento
+            return false;
           }
           return areRidersSamePerson(
             { name, number: formattedNumber },
@@ -330,7 +381,6 @@ export function computeChampionshipStandings(
         });
 
         if (!matchedRider) {
-          // Nuevo piloto en la categoría
           const newRider = {
             canonicalName: name || 'Piloto sin nombre',
             latestNumber: formattedNumber,
@@ -354,7 +404,7 @@ export function computeChampionshipStandings(
           matchedRider.latestBike = bike;
         }
 
-        // Si el nuevo nombre es más completo y detallado (más tokens o más largo), actualizar el nombre canónico
+        // Si el nuevo nombre es más completo y detallado, actualizar el nombre canónico
         if (name) {
           const currentTokens = tokenizeName(matchedRider.canonicalName);
           const newTokens = tokenizeName(name);
@@ -395,7 +445,6 @@ export function computeChampionshipStandings(
     });
 
     // Ordenar de mayor a menor puntaje
-    // Desempate: puntaje en la última válida disputada, luego nombre
     const lastEventId = eventsList[eventsList.length - 1]?.id;
 
     ridersArray.sort((a, b) => {

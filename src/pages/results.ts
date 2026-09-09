@@ -295,7 +295,7 @@ function renderGeneralCategoryPanel(catStandings: ChampionshipCategoryStandings,
       </div>
 
       <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-gray-light px-1">
-        <p>ℹ️ <strong>Criterio oficial:</strong> Sumatoria calculada exclusivamente con los puntos totales de la <strong>manga final</strong> de cada válida disputada.</p>
+        <p>ℹ️ <strong>Criterio oficial:</strong> Sumatoria calculada con los puntos de la <strong>manga final</strong> (o manga única en categorías de una sola carrera) de cada válida disputada.</p>
         <div class="flex items-center gap-3">
           ${events.map((ev) => `<span class="border border-secondary/20 rounded px-2 py-0.5"><strong>${escapeHtml(ev.shortLabel)}:</strong> ${escapeHtml(ev.name)}</span>`).join('')}
         </div>
@@ -312,7 +312,7 @@ function renderGeneralView(standings: ChampionshipCategoryStandings[]): string {
         </div>
         <h2 class="font-title text-2xl text-white mb-2">Sin válidas finalizadas aún</h2>
         <p class="text-gray-light max-w-md mx-auto mb-6">
-          Aún no se han publicado resultados de mangas finales en las válidas del campeonato para calcular el acumulado de puntos.
+          Aún no se han publicado resultados de mangas finales o carreras oficiales en las válidas del campeonato para calcular el acumulado de puntos.
         </p>
         <a href="./eventos.html" class="btn-secondary inline-block">Ver calendario de eventos</a>
       </div>`;
@@ -337,7 +337,7 @@ function renderGeneralView(standings: ChampionshipCategoryStandings[]): string {
         <h2 class="font-title text-3xl tracking-wide text-white mb-2">Tabla General de Posiciones</h2>
         <p class="text-sm text-secondary font-semibold">Campeonato Junior Minicross 2026</p>
         <p class="text-xs text-gray-light mt-1">
-          Sumatoria oficial de puntos acumulados válida a válida (puntos totales de la final)
+          Sumatoria oficial de puntos acumulados válida a válida (manga final o manga única)
         </p>
       </div>
 
