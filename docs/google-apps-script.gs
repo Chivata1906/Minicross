@@ -7,8 +7,9 @@
  * Despliega como Web App: Ejecutar como "Yo", Acceso "Cualquier persona".
  */
 
-const SPREADSHEET_ID = '1kAlC3MP2DqH5KXkQQLVZF0SbHV6X8DY3nAyLxO81654';
-const DRIVE_FOLDER_ID = '1TQAM3BE93OjiaODNgI_2SkXLFQ2uqQqM';
+const SPREADSHEET_ID = '1g5crmfmbcxyvmLMXxYECxO90gFYiXf7P5JaSze7pmbI';
+const DRIVE_FOLDER_ID = '1oImoS0x__kgBBXaL9HAg3Qf-4Zj0Xz0l';
+const RESULTS_FOLDER_ID = '1Kisf9A_zU_6Y7POqfazk2MC3KeKswiSW';
 
 const EVENT_HEADERS = ['id', 'name', 'date', 'location', 'city', 'description', 'active', 'reglamentoUrl', 'finished', 'valorInscripcion', 'championshipId', 'resultadosUrl'];
 const CATEGORY_HEADERS = ['id', 'championshipId', 'label', 'minAge', 'maxAge', 'active'];
@@ -650,6 +651,13 @@ function prepareEventRow_(ss, data) {
 // ─── Resultados (JSON y archivos en Drive) ───────────────────────────────────
 
 function getOrCreateResultsFolder_() {
+  if (typeof RESULTS_FOLDER_ID !== 'undefined' && RESULTS_FOLDER_ID) {
+    try {
+      var directFolder = DriveApp.getFolderById(RESULTS_FOLDER_ID);
+      makeDriveFilePublicView_(directFolder);
+      return directFolder;
+    } catch (e) {}
+  }
   var root = DriveApp.getFolderById(DRIVE_FOLDER_ID);
   var name = 'Resultados';
   var folders = root.getFoldersByName(name);
